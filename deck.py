@@ -52,7 +52,28 @@ from paths import CONFIG_DIR
 import ctypes
 import ctypes.util
 
-from paths import HERE, PID_FILE, STATUS_FILE, config_path, ensure_dirs
+from paths import HERE, PID_FILE, STATUS_FILE, STATE_FILE, LOG_FILE, config_path, ensure_dirs
+from board import PressTracker, SessionView, StateStore
+import logging
+import logging.handlers
+
+log = logging.getLogger("deck")
+
+
+def setup_logging():
+    """stdout (the journal under systemd) plus a rotating file under ~/.local/state."""
+    ensure_dirs()
+    log.setLevel(logging.INFO)
+    fmt = logging.Formatter("%(asctime)s %(message)s", "%Y-%m-%d %H:%M:%S")
+    out = logging.StreamHandler(sys.stdout)
+    out.setFormatter(logging.Formatter("%(message)s"))
+    log.addHandler(out)
+    try:
+        fh = logging.handlers.RotatingFileHandler(LOG_FILE, maxBytes=1_000_000, backupCount=3)
+        fh.setFormatter(fmt)
+        log.addHandler(fh)
+    except OSError:
+        pass
 
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FONT_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
@@ -302,64 +323,233 @@ def demo_sessions():
 
 
 class SessionBoard:
-    """Shared scanner; refreshed once per tick, read by every SessionSlot."""
+    """Shared scanner plus the SessionView (dismissals, filter, paging); refreshed
+    once per tick, read by every SessionSlot, CounterKey and PagerKey."""
 
-    def __init__(self):
+    def __init__(self, slots):
         self.scanner = SessionScanner()
+        self.store = StateStore(STATE_FILE)
+        self.view = SessionView(slots, self.store)
         self.sessions = []
 
     def refresh(self):
         if DEMO:
             self.sessions = demo_sessions()
-            return
-        try:
-            self.sessions = self.scanner.scan()
-        except Exception as e:  # a half-written file must not kill the board
-            print(f"session scan failed: {e}")
+        else:
+            try:
+                self.sessions = self.scanner.scan()
+            except Exception as e:  # a half-written file must not kill the board
+                log.info(f"session scan failed: {e}")
+        self.view.update(self.sessions)
+
+
+def render_session(s, pressed, hidden=False):
+    """The key image for one session (None -> empty slot)."""
+    if s is None:
+        return Image.new("RGB", (KEY_PX, KEY_PX), (12, 12, 14))
+    color = STATE_COLORS.get(s.state, (120, 120, 120))
+    img, d, fg = tile(dim(color, 0.12 if hidden else 0.22), pressed)
+    if not pressed:
+        d.rectangle([0, 0, KEY_PX, 4], fill=dim(color, 0.5) if hidden else color)
+    info = font(11)
+    if s.waiting_kind:
+        d.text((4, 6), s.waiting_kind, font=font(13), fill=color if not pressed else fg)
+    t = elapsed_text(s.since)
+    d.text((KEY_PX - 4 - d.textlength(t, font=info), 7), t, font=info,
+           fill=(200, 200, 200) if not pressed else fg)
+    lines, size = fit_lines(s.name, sizes=(13, 12, 11, 10, 9))
+    draw_centered_lines(d, lines, (150, 150, 160) if hidden and not pressed else fg, size=size, top=21)
+    frac = s.ctx_fraction
+    bar = (110, 110, 110) if frac < 0.6 else (245, 166, 35) if frac < 0.85 else (220, 60, 60)
+    d.rectangle([0, KEY_PX - 3, KEY_PX, KEY_PX], fill=(30, 30, 30))
+    d.rectangle([0, KEY_PX - 3, int(KEY_PX * frac), KEY_PX], fill=bar)
+    return img
 
 
 class SessionSlot(Key):
     dynamic = True
+    holdable = True   # hold dismisses
 
     def __init__(self, board, index):
         super().__init__({})
         self.board = board
         self.index = index
+        self.dismissed_ok = False
 
     @property
     def session(self):
-        return self.board.sessions[self.index] if self.index < len(self.board.sessions) else None
+        return self.board.view.visible()[self.index]
 
     def render(self, pressed):
-        s = self.session
-        if s is None:
-            return Image.new("RGB", (KEY_PX, KEY_PX), (12, 12, 14))
-        color = STATE_COLORS.get(s.state, (120, 120, 120))
-        img, d, fg = tile(dim(color), pressed)
-        if not pressed:
-            d.rectangle([0, 0, KEY_PX, 4], fill=color)          # state strip
-        # info line: waiting marker left, time in state right
-        info = font(11)
-        if s.waiting_kind:
-            d.text((4, 6), s.waiting_kind, font=font(13), fill=color if not pressed else fg)
-        t = elapsed_text(s.since)
-        d.text((KEY_PX - 4 - d.textlength(t, font=info), 7), t, font=info,
-               fill=(200, 200, 200) if not pressed else fg)
-        # title
-        lines, size = fit_lines(s.name, sizes=(13, 12, 11, 10, 9))
-        draw_centered_lines(d, lines, fg, size=size, top=21)
-        # context bar
-        frac = s.ctx_fraction
-        bar = (110, 110, 110) if frac < 0.6 else (245, 166, 35) if frac < 0.85 else (220, 60, 60)
-        d.rectangle([0, KEY_PX - 3, KEY_PX, KEY_PX], fill=(30, 30, 30))
-        d.rectangle([0, KEY_PX - 3, int(KEY_PX * frac), KEY_PX], fill=bar)
-        return img
+        return render_session(self.session, pressed)
 
     def tap(self):
         s = self.session
         if s and s.cwd:
             launch("code " + shlex.quote(s.cwd))
 
+    def hold(self):
+        s = self.session
+        self.dismissed_ok = self.board.view.dismiss(s)
+        if self.dismissed_ok:
+            log.info(f"dismissed: {s.name} ({s.state})")
+            nav.dirty = True
+
+    def render_held(self):
+        s = self.session
+        if s is not None and s.state == "running":
+            img, d, fg = tile((60, 60, 70), False)
+            draw_centered_lines(d, ["running,", "not", "dismissed"], fg, size=12, top=14)
+            return img
+        img, d, fg = tile((40, 40, 50), False)
+        draw_centered_lines(d, ["hidden"], fg, size=16, top=26)
+        return img
+
+
+class CounterKey(Key):
+    """Number of sessions in one state; tap filters the board to that state
+    (bright border while on); hold on the done counter dismisses every done session."""
+    dynamic = True
+
+    def __init__(self, board, state):
+        super().__init__({})
+        self.board, self.state = board, state
+        self.holdable = state == "done"
+        self.last_dismissed = 0
+
+    def render(self, pressed):
+        v = self.board.view
+        n = v.count(self.state)
+        color = STATE_COLORS[self.state]
+        img, d, fg = tile(dim(color, 0.35 if n else 0.15), pressed)
+        if v.filter == self.state and not pressed:
+            d.rectangle([0, 0, KEY_PX - 1, KEY_PX - 1], outline=color, width=3)
+        draw_centered_lines(d, [self.state], fg if n else (150, 150, 160), size=12, top=9)
+        draw_centered_lines(d, [str(n)], fg if n else (150, 150, 160), size=30, top=26)
+        return img
+
+    def tap(self):
+        self.board.view.toggle_filter(self.state)
+        nav.dirty = True
+
+    def hold(self):
+        self.last_dismissed = self.board.view.dismiss_all_done()
+        nav.dirty = True
+
+    def render_held(self):
+        img, d, fg = tile((40, 40, 50), False)
+        draw_centered_lines(d, [f"{self.last_dismissed}", "hidden"], fg, size=16, top=18)
+        return img
+
+
+class PagerKey(Key):
+    """prev: previous session page, from the first page the stats page; hold shows the
+    dismissed sessions. next: next page; hold cycles brightness 30 / 60 / 100."""
+    dynamic = True
+    holdable = True
+
+    def __init__(self, board, direction, on_brightness=None):
+        super().__init__({})
+        self.board, self.direction, self.on_brightness = board, direction, on_brightness
+
+    def render(self, pressed):
+        v = self.board.view
+        pages = v.page_count()
+        img, d, fg = tile((36, 36, 44), pressed)
+        symbol = "<" if self.direction == "prev" else ">"
+        draw_centered_lines(d, [symbol], fg, size=30, top=10)
+        if self.direction == "prev" and v.page == 0:
+            label = "stats"
+        else:
+            label = f"{v.page + 1}/{pages}"
+        draw_centered_lines(d, [label], (170, 170, 180) if not pressed else fg, size=11, top=50, bold=False)
+        return img
+
+    def tap(self):
+        v = self.board.view
+        if self.direction == "prev":
+            if v.page == 0:
+                nav.push(StatsPage(self.board))
+            else:
+                v.turn(-1)
+        else:
+            v.turn(1)
+        nav.dirty = True
+
+    def hold(self):
+        if self.direction == "prev":
+            nav.push(DismissedPage(self.board))
+        elif self.on_brightness:
+            self.on_brightness()
+        nav.dirty = True
+
+    def render_held(self):
+        return self.render(True)
+
+
+class DismissedSessionKey(Key):
+    """A dismissed session on the dismissed page; tap brings it back."""
+
+    def __init__(self, board, s):
+        super().__init__({})
+        self.board, self.s = board, s
+
+    def render(self, pressed):
+        return render_session(self.s, pressed, hidden=True)
+
+    def tap(self):
+        self.board.view.restore(self.s.session_id)
+        log.info(f"restored: {self.s.name}")
+        nav.dirty = True
+
+
+class DismissedPage:
+    def __init__(self, board):
+        self.board = board
+
+    def keys(self):
+        keys = [Blank({}) for _ in range(KEY_COUNT)]
+        keys[0] = NavKey("<", "back", nav.pop)
+        hidden = self.board.view.dismissed_sessions()
+        if not hidden:
+            keys[2] = Blank({})
+            img_key = NavKey("", "nothing hidden", lambda: None)
+            keys[2] = img_key
+        for n, s in enumerate(hidden[:KEY_COUNT - 1], start=1):
+            keys[n] = DismissedSessionKey(self.board, s)
+        return keys
+
+
+class StatsPage:
+    """Placeholder until the stats tiles land: shows session totals."""
+
+    def __init__(self, board):
+        self.board = board
+
+    def keys(self):
+        v = self.board.view
+        keys = [Blank({}) for _ in range(KEY_COUNT)]
+        keys[0] = NavKey("<", "back", nav.pop)
+        for n, state in enumerate(("waiting", "running", "done", "stopped", "failed"), start=1):
+            keys[n] = StatTile(state, str(v.count(state)), STATE_COLORS[state])
+        return keys
+
+
+class StatTile(Key):
+    def __init__(self, title, value, color=(90, 90, 100), foot=""):
+        super().__init__({})
+        self.title, self.value, self.color, self.foot = title, value, color, foot
+
+    def render(self, pressed):
+        img, d, fg = tile(dim(self.color, 0.3), pressed)
+        if not pressed:
+            d.rectangle([0, 0, KEY_PX, 4], fill=self.color)
+        draw_centered_lines(d, [self.title], fg, size=11, top=9)
+        lines, size = fit_lines(self.value, max_lines=1, sizes=(26, 22, 18, 14, 11))
+        draw_centered_lines(d, lines, fg, size=size, top=24)
+        if self.foot:
+            draw_centered_lines(d, [self.foot], (200, 200, 210) if not pressed else fg, size=10, top=56, bold=False)
+        return img
 
 
 _slack_state = None
@@ -425,7 +615,7 @@ class Slack(Key):
         if mentions:
             d.text((6, 36), f"@{mentions}", font=font(12), fill=(255, 200, 80) if not pressed else fg)
         lines, size = fit_lines(ws["name"], max_lines=1, sizes=(13, 12, 11, 10, 9))
-        draw_centered_lines(d, lines, fg, size=size, top=KEY_PX - size - 8)
+        draw_centered_lines(d, lines, fg, size=size, top=KEY_PX - size - 16)
         return img
 
     def tap(self):
@@ -575,7 +765,7 @@ class TodoItemKey(Key):
 
     def hold(self):
         self.done = self.todo.mark_done(self.item)
-        print(f"todo: {'done' if self.done else 'could not mark'}: {self.item.title}")
+        log.info(f"todo: {'done' if self.done else 'could not mark'}: {self.item.title}")
 
     def render_held(self):
         img, d, fg = tile((40, 120, 60) if self.done else (120, 40, 40), False)
@@ -616,6 +806,28 @@ class TodoPage:
 KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume, "slack": Slack}
 
 
+BRIGHTNESS_STEPS = (30, 60, 100)
+
+
+def cycle_brightness(config_file):
+    """Hold on the next-page key: 30 -> 60 -> 100 -> 30, written to the layout file,
+    which the running board reloads."""
+    try:
+        with open(config_file) as f:
+            cfg = json.load(f)
+        cur = int(cfg.get("brightness", 60))
+        nxt = next((b for b in BRIGHTNESS_STEPS if b > cur), BRIGHTNESS_STEPS[0])
+        cfg["brightness"] = nxt
+        tmp = config_file + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(cfg, f, indent=2)
+            f.write("\n")
+        os.replace(tmp, config_file)
+        log.info(f"brightness {cur} -> {nxt}")
+    except (OSError, ValueError) as e:
+        log.info(f"brightness change failed: {e}")
+
+
 def load_board(path):
     with open(path) as f:
         cfg = json.load(f)
@@ -623,21 +835,33 @@ def load_board(path):
     for idx, kcfg in cfg.get("keys", {}).items():
         i = int(idx)
         if not 0 <= i < KEY_COUNT:
-            print(f"keys.json: ignoring key {idx}, valid keys are 0..{KEY_COUNT - 1}")
+            log.info(f"keys.json: ignoring key {idx}, valid keys are 0..{KEY_COUNT - 1}")
             continue
         ktype = kcfg.get("type", "command")
-        if ktype == "todo":
-            keys[i] = ("todo", kcfg)  # resolved below, once the list exists
+        if ktype in ("todo", "counter", "pager"):
+            keys[i] = (ktype, kcfg)  # resolved below, once the shared objects exist
             continue
         if ktype not in KEY_TYPES:
-            print(f"keys.json: key {idx} has unknown type {ktype!r}")
+            log.info(f"keys.json: key {idx} has unknown type {ktype!r}")
             continue
         keys[i] = KEY_TYPES[ktype](kcfg)
     providers = []
+    region = [int(x) for x in cfg.get("sessions", {}).get("keys", []) if 0 <= int(x) < KEY_COUNT]
+    board = None
+    if region or any(isinstance(k, tuple) and k[0] in ("counter", "pager") for k in keys):
+        board = SessionBoard(len(region) or 1)
+        providers.append(board)
+        for n, idx in enumerate(region):
+            keys[idx] = SessionSlot(board, n)
+    for i, k in enumerate(keys):
+        if isinstance(k, tuple) and k[0] == "counter":
+            keys[i] = CounterKey(board, k[1].get("state", "waiting"))
+        elif isinstance(k, tuple) and k[0] == "pager":
+            keys[i] = PagerKey(board, k[1].get("dir", "next"), on_brightness=lambda: cycle_brightness(path))
     defaults = cfg.get("todo", {})           # optional board-wide defaults for todo keys
     lists = {}                               # one TodoList per file, shared by keys on the same file
     for i, k in enumerate(keys):
-        if isinstance(k, tuple):
+        if isinstance(k, tuple) and k[0] == "todo":
             kcfg = {**defaults, **k[1]}
             path = os.path.expanduser(kcfg.get("file") or os.path.join(CONFIG_DIR, "todo.md"))
             if path not in lists:
@@ -645,16 +869,9 @@ def load_board(path):
                 try:
                     lists[path].ensure_file()
                 except OSError as e:
-                    print(f"todo: cannot create {path}: {e}")
+                    log.info(f"todo: cannot create {path}: {e}")
                 providers.append(lists[path])
             keys[i] = TodoKey(kcfg, lists[path])
-    region = cfg.get("sessions", {}).get("keys", [])
-    if region:
-        board = SessionBoard()
-        providers.append(board)
-        for n, idx in enumerate(region):
-            if 0 <= int(idx) < KEY_COUNT:
-                keys[int(idx)] = SessionSlot(board, n)
     return keys, int(cfg.get("brightness", 60)), providers, ScreenSaver(cfg.get("screensaver", {}))
 
 
@@ -696,7 +913,7 @@ class ScreenSaver:
                 self._picture = img.crop((x, y, x + LCD_W, y + LCD_H))
             except (OSError, ValueError) as e:
                 self._picture_err = str(e)
-                print(f"screensaver: cannot load {self.image_setting}: {e}; using the clock")
+                log.info(f"screensaver: cannot load {self.image_setting}: {e}; using the clock")
         return self._picture
 
     @property
@@ -757,7 +974,7 @@ def open_deck():
         return None
     node, pid, _ = found
     deck = Deck(node)
-    print(f"connected to {node} (serial {deck.serial()}, firmware {deck.firmware()})")
+    log.info(f"connected to {node} (serial {deck.serial()}, firmware {deck.firmware()})")
     return deck
 
 
@@ -772,10 +989,11 @@ def main():
     args = ap.parse_args()
     global DEMO
     DEMO = args.demo
+    setup_logging()
 
     if args.config is None:
         args.config = config_path()
-    print(f"layout: {args.config}")
+    log.info(f"layout: {args.config}")
     keys, brightness, providers, saver = load_board(args.config)
     config_mtime = os.path.getmtime(args.config)
     global nav
@@ -790,9 +1008,10 @@ def main():
         nonlocal last_status
         counts = {"waiting": 0, "running": 0, "done": 0}
         for p in providers:
-            for s in getattr(p, "sessions", []):
-                if s.state in counts:
-                    counts[s.state] += 1
+            view = getattr(p, "view", None)
+            if view is not None:
+                for st in counts:
+                    counts[st] += view.count(st)
         status = {"deck": connected, **counts}
         if status != last_status:
             last_status = status
@@ -809,9 +1028,7 @@ def main():
 
     deck = None
     pressed = [False] * KEY_COUNT
-    press_key = [None] * KEY_COUNT   # the Key object under a finger, for holdable keys
-    press_at = [0.0] * KEY_COUNT
-    held = [False] * KEY_COUNT
+    presses = PressTracker(HOLD_S)
     sent = [None] * KEY_COUNT        # JPEG bytes last sent per key
     next_open = 0.0
     next_refresh = 0.0
@@ -856,14 +1073,14 @@ def main():
                 try:
                     keys, brightness, providers, saver = load_board(args.config)
                     nav = Navigator(keys)
-                    print("config reloaded")
+                    log.info("config reloaded")
                     if deck is not None:
                         deck.set_brightness(brightness)
                         deck.set_sleep_timeout(saver.sleep_s)
                     sent = [None] * KEY_COUNT
                     saver_sent = None
                 except (OSError, ValueError) as e:
-                    print(f"config reload failed: {e}")
+                    log.info(f"config reload failed: {e}")
 
             # another account owns the screen: let go of the deck, its own deck.py takes over
             if now >= next_seat_check:
@@ -871,13 +1088,13 @@ def main():
                 active = seat_active_uid()
                 inactive = active is not None and active != os.getuid()
                 if inactive and not seat_paused:
-                    print("another account is active, releasing the deck")
+                    log.info("another account is active, releasing the deck")
                     seat_paused = True
                     if deck is not None:
                         deck.close()
                         deck = None
                 elif seat_paused and not inactive:
-                    print("this account is active again")
+                    log.info("this account is active again")
                     seat_paused = False
                     last_activity = now
             if seat_paused:
@@ -890,7 +1107,7 @@ def main():
                 try:
                     deck = open_deck()
                     if deck is None:
-                        print("no deck found, retrying...")
+                        log.info("no deck found, retrying...")
                     else:
                         deck.fill_color(0, 0, 0)
                         deck.set_brightness(brightness)
@@ -904,7 +1121,7 @@ def main():
                 except UnsupportedDeck as e:
                     sys.exit(str(e))
                 except OSError as e:
-                    print(f"open failed: {e}")
+                    log.info(f"open failed: {e}")
                     deck = None
 
             if deck is None:
@@ -917,7 +1134,7 @@ def main():
                     saver_active = True
                     saver_sent = None
                     deck.fill_color(0, 0, 0)
-                    print("screen saver on")
+                    log.info("screen saver on")
 
                 if now >= next_refresh:
                     next_refresh = now + REFRESH_S
@@ -933,7 +1150,7 @@ def main():
                                     saver_sent[i] = data
                             if args.preview and not previewed:
                                 board_image(tiles).save(args.preview)
-                                print(f"preview saved to {args.preview}")
+                                log.info(f"preview saved to {args.preview}")
                                 previewed = True
                         else:
                             data = Deck.encode_screen(saver.render())
@@ -942,28 +1159,26 @@ def main():
                                 saver_sent = data
                             if args.preview and not previewed:
                                 saver.render().save(args.preview)
-                                print(f"preview saved to {args.preview}")
+                                log.info(f"preview saved to {args.preview}")
                                 previewed = True
                     else:
                         images = paint()
                         if args.preview and not previewed:
                             board_image(images).save(args.preview)
-                            print(f"preview saved to {args.preview}")
+                            log.info(f"preview saved to {args.preview}")
                             previewed = True
                     write_status(True)
 
                 # holds: a holdable key kept down past HOLD_S fires once
-                for i in range(KEY_COUNT):
-                    k = press_key[i]
-                    if k is not None and not held[i] and time.monotonic() - press_at[i] >= HOLD_S:
-                        held[i] = True
-                        try:
-                            k.hold()
-                        except Exception as e:
-                            print(f"key {i} hold failed: {e}")
-                        data = Deck.encode_image(k.render_held())
-                        deck.set_key_jpeg(i, data)
-                        sent[i] = data
+                for _, i, k in presses.tick(time.monotonic()):
+                    log.info(f"key {i} hold")
+                    try:
+                        k.hold()
+                    except Exception as e:
+                        log.info(f"key {i} hold failed: {e}")
+                    data = Deck.encode_image(k.render_held())
+                    deck.set_key_jpeg(i, data)
+                    sent[i] = data
 
                 states = deck.read_keys(0.05)
                 if states is not None:
@@ -974,37 +1189,27 @@ def main():
                             # wake up: back to the board, and swallow this press
                             saver_active = False
                             saver_sent = None
-                            print("screen saver off")
+                            log.info("screen saver off")
                             deck.fill_color(0, 0, 0)
                             sent = [None] * KEY_COUNT
                             paint(force=True)
                             pressed = states
+                            presses.reset()
                             next_refresh = time.monotonic() + REFRESH_S
                         continue
                     for i, (was, is_now) in enumerate(zip(pressed, states)):
                         if was == is_now:
                             continue
                         pressed[i] = is_now
-                        key = nav.keys()[i]
-                        fire = None
-                        if is_now:
-                            if key.holdable:
-                                press_key[i], press_at[i], held[i] = key, time.monotonic(), False
-                            else:
-                                fire = key
-                        else:
-                            k = press_key[i]
-                            press_key[i] = None
-                            if k is not None and not held[i]:
-                                fire = k          # short press of a holdable key: tap on release
-                            if k is not None and held[i]:
-                                sent[i] = None    # drop the hold feedback on release
-                        if fire is not None:
-                            print(f"key {i} tap")
-                            try:
-                                fire.tap()
-                            except Exception as e:  # a bad command must not kill the board
-                                print(f"key {i} action failed: {e}")
+                        for action, _, k in presses.feed(i, nav.keys()[i], is_now, time.monotonic()):
+                            if action == "tap":
+                                log.info(f"key {i} tap")
+                                try:
+                                    k.tap()
+                                except Exception as e:  # a bad command must not kill the board
+                                    log.info(f"key {i} action failed: {e}")
+                            elif action == "release-after-hold":
+                                sent[i] = None    # drop the hold feedback
                         if nav.dirty:
                             paint()        # a page changed: redraw everything now
                             continue
@@ -1013,7 +1218,7 @@ def main():
                             deck.set_key_jpeg(i, data)
                             sent[i] = data
             except OSError as e:
-                print(f"deck lost ({e}), waiting for it to come back")
+                log.info(f"deck lost ({e}), waiting for it to come back")
                 deck.close()
                 deck = None
                 next_open = time.monotonic() + RECONNECT_S
@@ -1038,7 +1243,7 @@ def main():
                 os.remove(f)
             except OSError:
                 pass
-        print("bye")
+        log.info("bye")
 
 
 if __name__ == "__main__":

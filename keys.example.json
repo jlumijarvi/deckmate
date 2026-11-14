@@ -23,6 +23,26 @@
       "label": "Browser",
       "color": "#e36209",
       "run": "xdg-open https://claude.ai"
+    },
+    "10": {
+      "type": "counter",
+      "state": "waiting"
+    },
+    "11": {
+      "type": "counter",
+      "state": "running"
+    },
+    "12": {
+      "type": "counter",
+      "state": "done"
+    },
+    "13": {
+      "type": "pager",
+      "dir": "prev"
+    },
+    "14": {
+      "type": "pager",
+      "dir": "next"
     }
   },
   "sessions": {
@@ -31,12 +51,7 @@
       6,
       7,
       8,
-      9,
-      10,
-      11,
-      12,
-      13,
-      14
+      9
     ]
   },
   "screensaver": {

@@ -18,6 +18,10 @@ RUNTIME_DIR = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/stream-de
 PID_FILE = os.path.join(RUNTIME_DIR, "deck.pid")
 STATUS_FILE = os.path.join(RUNTIME_DIR, "status.json")
 
+STATE_FILE = os.path.join(CONFIG_DIR, "state.json")
+LOG_DIR = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "stream-deck")
+LOG_FILE = os.path.join(LOG_DIR, "deck.log")
+
 INSTALLED = HERE.startswith("/usr/")
 
 
@@ -32,6 +36,7 @@ def version():
 def ensure_dirs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     os.makedirs(RUNTIME_DIR, exist_ok=True)
+    os.makedirs(LOG_DIR, exist_ok=True)
 
 
 def config_path():

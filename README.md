@@ -111,6 +111,8 @@ a plain button with a shell command, or a live key:
 | `volume` | speaker volume | changes it by `step` percent |
 | `slack` | workspace name and a badge with the number of conversations that have unread messages, plus `@n` for mentions and DMs | opens that workspace in Slack |
 | `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a sub-deck |
+| `counter` (`state`: waiting, running or done) | how many sessions are in that state | filters the board to that state, bright border while on; hold on the done counter hides every done session |
+| `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page, or the stats page from the first; hold shows hidden sessions. next: next page; hold cycles brightness 30 / 60 / 100 |
 
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
 sessions fill them.
@@ -148,6 +150,21 @@ are the items, overdue first, then by due date, then undated; with more than
 (click it in the settings window): `file`, `label`, `open_with` (default
 `code`), `soon_days` (0 means only items due today count as "due soon"),
 `hold_done` (default true). Two to-do keys with different files give two lists.
+
+## Log
+
+The board logs to the journal (`journalctl --user -u stream-deck`) and to
+`~/.local/state/stream-deck/deck.log`, rotated at 1 MB, three files kept.
+
+## Tests
+
+```
+python3 -m unittest discover -s tests
+```
+
+Covers press and hold detection, dismissal and return, filters, paging, the
+state store, the session state classifier, the to-do parser and the Slack
+parser. `build_deb.sh` runs them and refuses to build on a failure.
 
 ## Screen saver
 

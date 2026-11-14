@@ -7,6 +7,8 @@ STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 LIB="$STAGE/usr/lib/stream-deck"
 
+python3 -m unittest discover -s "$HERE/tests" -q 2>&1 | tail -1 | grep -q "^OK" || { python3 -m unittest discover -s "$HERE/tests"; echo "tests failed, not building"; exit 1; }
+
 mkdir -p "$LIB" "$STAGE/DEBIAN" "$STAGE/usr/bin" "$STAGE/usr/share/applications" \
          "$STAGE/etc/xdg/autostart" "$STAGE/usr/lib/systemd/user" \
          "$STAGE/usr/share/icons/hicolor/scalable/apps"
