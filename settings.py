@@ -21,10 +21,8 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, ROWS, KEY_COUNT  # noqa: E402
 from slackstate import SlackState  # noqa: E402
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-CONFIG = os.path.join(HERE, "keys.json")
-EXAMPLE = os.path.join(HERE, "keys.example.json")
-PID_FILE = os.path.join(HERE, ".deck.pid")
+from paths import HERE, CONFIG, EXAMPLE, PID_FILE, config_path, version  # noqa: E402
+
 DECK_PY = os.path.join(HERE, "deck.py")
 
 KEY_KINDS = [
@@ -45,7 +43,7 @@ KIND_LABEL = dict(KEY_KINDS)
 # --- config ------------------------------------------------------------------
 
 def load_config():
-    for path in (CONFIG, EXAMPLE):
+    for path in (config_path(), EXAMPLE):
         try:
             with open(path) as f:
                 return json.load(f)
@@ -137,7 +135,14 @@ SERVICE = "stream-deck.service"
 
 
 def service_installed():
-    return os.path.exists(os.path.expanduser(f"~/.config/systemd/user/{SERVICE}"))
+    """True when systemd knows a stream-deck.service for this user (from the package
+    or from install_service.sh)."""
+    try:
+        out = subprocess.run(["systemctl", "--user", "show", SERVICE, "-p", "LoadState", "--value"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return out == "loaded"
 
 
 def start_board():
@@ -281,7 +286,7 @@ class KeyDialog(Adw.Dialog):
 
 class SettingsWindow(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Stream Deck settings")
+        super().__init__(application=app, title=f"Stream Deck settings  ·  v{version()}")
         self.set_default_size(620, 680)
         self.cfg = load_config()
         self._save_pending = None

@@ -45,8 +45,8 @@ from slackstate import SlackState, SNAP_ICON
 import ctypes
 import ctypes.util
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-PID_FILE = os.path.join(HERE, ".deck.pid")
+from paths import HERE, PID_FILE, STATUS_FILE, config_path, ensure_dirs
+
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FONT_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 RECONNECT_S = 2.0
@@ -562,14 +562,33 @@ def main():
     DEMO = args.demo
 
     if args.config is None:
-        args.config = os.path.join(HERE, "keys.json")
-        if not os.path.exists(args.config):
-            args.config = os.path.join(HERE, "keys.example.json")
-            print("no keys.json yet, using keys.example.json (the settings window creates keys.json)")
+        args.config = config_path()
+    print(f"layout: {args.config}")
     keys, brightness, providers, saver = load_board(args.config)
     config_mtime = os.path.getmtime(args.config)
+    ensure_dirs()
     with open(PID_FILE, "w") as f:
         f.write(str(os.getpid()))
+    last_status = None
+
+    def write_status(connected):
+        """A small file for the tray icon: is the deck connected, how many sessions wait."""
+        nonlocal last_status
+        counts = {"waiting": 0, "running": 0, "done": 0}
+        for p in providers:
+            for s in getattr(p, "sessions", []):
+                if s.state in counts:
+                    counts[s.state] += 1
+        status = {"deck": connected, **counts}
+        if status != last_status:
+            last_status = status
+            try:
+                tmp = STATUS_FILE + ".tmp"
+                with open(tmp, "w") as f:
+                    json.dump(status, f)
+                os.replace(tmp, STATUS_FILE)
+            except OSError:
+                pass
 
     stop = {"now": False}
     signal.signal(signal.SIGTERM, lambda *_: stop.__setitem__("now", True))
@@ -667,6 +686,7 @@ def main():
                     deck = None
 
             if deck is None:
+                write_status(False)
                 time.sleep(0.2)
                 continue
 
@@ -708,6 +728,7 @@ def main():
                             board_image(images).save(args.preview)
                             print(f"preview saved to {args.preview}")
                             previewed = True
+                    write_status(True)
 
                 states = deck.read_keys(0.05)
                 if states is not None:
@@ -758,10 +779,11 @@ def main():
             except OSError:
                 pass
             deck.close()
-        try:
-            os.remove(PID_FILE)
-        except OSError:
-            pass
+        for f in (PID_FILE, STATUS_FILE):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
         print("bye")
 
 

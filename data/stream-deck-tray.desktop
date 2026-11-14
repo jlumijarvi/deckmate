@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Stream Deck tray icon
+Comment=Top-bar icon for the Stream Deck board
+Exec=stream-deck tray
+Icon=stream-deck
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=GNOME;Unity;XFCE;KDE;

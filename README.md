@@ -4,18 +4,47 @@ A small Python program that drives an Elgato Stream Deck (Original V2 or MK.2,
 15 keys) on Ubuntu, with no Elgato software and no libraries beyond Pillow.
 It talks the deck's stock USB HID protocol through `/dev/hidraw*`.
 
+## Install (Ubuntu)
+
+Download the `.deb` from the latest
+[release](https://github.com/jlumijarvi/stream-deck/releases) and install it:
+
+```
+sudo apt install ./stream-deck_<version>_all.deb
+```
+
+Then log out and in. Every account on the machine gets the board at login, a
+top-bar icon with a menu (board status, start/stop, settings, updates), and a
+"Stream Deck" entry in the app grid that opens the settings. Each account has
+its own layout in `~/.config/stream-deck/keys.json`.
+
+The top-bar icon needs GNOME's AppIndicator extension, which Ubuntu enables by
+default. The tray icon checks GitHub once a day for a newer release and offers
+to install it from its menu; the install asks for your password.
+
+Command line: `stream-deck settings | board | sessions | tray | --version`.
+
+## Releasing a new version
+
+Develop in a git checkout, commit, then `./release.sh 0.2.0`. That bumps
+VERSION, tags, builds the `.deb` with `./build_deb.sh` and publishes a GitHub
+release with the package attached, which is what the tray icons look for.
+
 ## Files
 
 | File | What it is |
 | --- | --- |
 | `deckhid.py` | the driver: find the deck, set brightness, paint keys, read presses |
 | `deck.py` | the board: reads `keys.json`, paints keys, runs actions |
-| `keys.json` | your layout, reloaded automatically when saved; not in git |
+| `~/.config/stream-deck/keys.json` | your layout, reloaded automatically when saved |
 | `keys.example.json` | the starting layout, used until keys.json exists |
 | `sessions.py` | finds live Claude Code sessions and their state |
 | `slackstate.py` | reads Slack's local state file for the unread badge |
 | `settings.py` | settings window (GTK): edit keys.json, start/stop the board, replace the stored image |
-| `install_service.sh` | starts the board at login for the current Linux account (`--remove` undoes it) |
+| `tray.py` | top-bar icon (GTK 3 + AppIndicator) with status, start/stop, settings and updates |
+| `paths.py` | where config, pid and status files live |
+| `install_service.sh` | git-checkout alternative to the package: a per-user login service |
+| `build_deb.sh`, `release.sh`, `packaging/`, `data/` | the Debian package, desktop files, icons |
 | `hello_deck.py` | the first test: numbered colour tiles, prints key presses |
 
 ## Run
@@ -32,21 +61,21 @@ python3 deck.py --saver    # start in screen-saver mode
 The deck must be plugged in and you must be logged in at the desktop, which is
 what gives your user access to the device node.
 
-## Start at login
+## The board service
+
+The package installs a systemd user service, enabled for all accounts, that
+starts the board with the graphical session and stops at logout:
 
 ```
-./install_service.sh            # install a systemd user service and start it
-./install_service.sh --remove   # stop it and remove it
 systemctl --user status stream-deck
 journalctl --user -u stream-deck -f
 ```
 
-The service starts with the graphical session and stops at logout. The Start
-and Stop buttons in the settings window drive the service once it is installed.
+Running from a git checkout instead: `./install_service.sh` installs the same
+kind of service for the current account only (`--remove` undoes it). Do not
+use both.
 
-Several Linux accounts: home folders are private, so each account needs its own
-copy of this folder (`git clone https://github.com/jlumijarvi/stream-deck`), its
-own keys.json and its own run of install_service.sh. Only the account that
+Several Linux accounts: each has its own keys.json. Only the account that
 currently owns the screen drives the deck; when you switch user, the other
 account's board lets go within two seconds and the new one takes over.
 

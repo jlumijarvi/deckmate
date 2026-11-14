@@ -2,8 +2,8 @@
 # Start the Stream Deck board at login for the account that runs this script.
 #   ./install_service.sh           install and start
 #   ./install_service.sh --remove  stop and remove
-# Run it once per Linux account that should drive the deck; each account needs
-# its own copy of this folder (git clone) because home folders are private.
+# For running from a git checkout. The .deb package installs its own unit for
+# every account instead; do not use both.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 UNIT_DIR="$HOME/.config/systemd/user"

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Command-line entry point for the installed Stream Deck board.
+LIB=/usr/lib/stream-deck
+case "$1" in
+    settings) shift; exec python3 "$LIB/settings.py" "$@" ;;
+    board)    shift; exec python3 -u "$LIB/deck.py" "$@" ;;
+    tray|"")  [ $# -gt 0 ] && shift; exec python3 "$LIB/tray.py" "$@" ;;
+    sessions) exec python3 "$LIB/sessions.py" ;;
+    --version|version) cat "$LIB/VERSION" ;;
+    *) echo "usage: stream-deck [tray|settings|board|sessions|--version]"; exit 2 ;;
+esac

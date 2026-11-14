@@ -1,0 +1,14 @@
+Package: stream-deck
+Version: @VERSION@
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: jlumijarvi <jlumijarvi@users.noreply.github.com>
+Depends: python3 (>= 3.11), python3-pil, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, libnotify-bin, pkexec
+Recommends: gnome-shell-extension-appindicator
+Homepage: https://github.com/jlumijarvi/stream-deck
+Description: Elgato Stream Deck board with Claude Code session keys
+ Drives a 15-key Elgato Stream Deck (Original V2 or MK.2) on Linux without
+ the Elgato software: configurable buttons, a clock, audio keys, a Slack
+ unread badge, one key per running Claude Code session, a screen saver,
+ a settings window and a top-bar icon.
