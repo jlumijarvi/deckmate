@@ -133,25 +133,35 @@ class TokenTally:
                     continue
             self._read_from(path, offset)
 
+    CHUNK = 1 << 20   # read big transcripts a megabyte at a time, not whole
+
     def _read_from(self, path, offset):
         try:
             with open(path, "rb") as f:
                 f.seek(offset)
-                data = f.read()
+                while True:
+                    data = f.read(self.CHUNK)
+                    if not data:
+                        break
+                    end = data.rfind(b"\n")
+                    if end == -1:
+                        # a line longer than the chunk: skip ahead to its end
+                        rest = f.readline()
+                        data = data + rest
+                        end = data.rfind(b"\n")
+                        if end == -1:
+                            break             # unfinished last line: wait for the newline
+                    for raw in data[:end].split(b"\n"):
+                        if b'"assistant"' not in raw:
+                            continue
+                        parsed = parse_usage_line(raw.decode("utf-8", "replace"))
+                        if parsed is not None:
+                            self.add(*parsed)
+                    offset += end + 1
+                    self.offsets[path] = offset
+                    f.seek(offset)            # re-read the partial tail next round
         except OSError:
             return
-        # keep a trailing partial line for next time
-        end = data.rfind(b"\n")
-        if end == -1:
-            return
-        self.offsets[path] = offset + end + 1
-        for raw in data[:end].split(b"\n"):
-            if b'"assistant"' not in raw:
-                continue
-            parsed = parse_usage_line(raw.decode("utf-8", "replace"))
-            if parsed is None:
-                continue
-            self.add(*parsed)
 
     def add(self, mid, ts, tin, tout, tcache):
         if ts < self.day_start or mid in self.seen:
