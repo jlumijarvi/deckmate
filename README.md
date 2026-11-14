@@ -10,7 +10,8 @@ It talks the deck's stock USB HID protocol through `/dev/hidraw*`.
 | --- | --- |
 | `deckhid.py` | the driver: find the deck, set brightness, paint keys, read presses |
 | `deck.py` | the board: reads `keys.json`, paints keys, runs actions |
-| `keys.json` | your layout, reloaded automatically when saved |
+| `keys.json` | your layout, reloaded automatically when saved; not in git |
+| `keys.example.json` | the starting layout, used until keys.json exists |
 | `sessions.py` | finds live Claude Code sessions and their state |
 | `settings.py` | settings window (GTK): edit keys.json, start/stop the board, replace the stored image |
 | `hello_deck.py` | the first test: numbered colour tiles, prints key presses |

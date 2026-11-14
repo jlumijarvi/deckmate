@@ -22,6 +22,7 @@ from deckhid import Deck, UnsupportedDeck, find_deck, COLS, ROWS, KEY_COUNT  # n
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(HERE, "keys.json")
+EXAMPLE = os.path.join(HERE, "keys.example.json")
 PID_FILE = os.path.join(HERE, ".deck.pid")
 DECK_PY = os.path.join(HERE, "deck.py")
 
@@ -42,11 +43,13 @@ KIND_LABEL = dict(KEY_KINDS)
 # --- config ------------------------------------------------------------------
 
 def load_config():
-    try:
-        with open(CONFIG) as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
+    for path in (CONFIG, EXAMPLE):
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            continue
+    return {}
 
 
 def save_config(cfg):

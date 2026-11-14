@@ -445,7 +445,8 @@ def open_deck():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--config", default=os.path.join(HERE, "keys.json"))
+    ap.add_argument("--config", default=None,
+                    help="layout file (default: keys.json, or keys.example.json if that is missing)")
     ap.add_argument("--seconds", type=float, default=None, help="exit after N seconds")
     ap.add_argument("--preview", metavar="PNG", help="save the board as an image once painted")
     ap.add_argument("--demo", action="store_true", help="show made-up sessions in every state")
@@ -454,6 +455,11 @@ def main():
     global DEMO
     DEMO = args.demo
 
+    if args.config is None:
+        args.config = os.path.join(HERE, "keys.json")
+        if not os.path.exists(args.config):
+            args.config = os.path.join(HERE, "keys.example.json")
+            print("no keys.json yet, using keys.example.json (the settings window creates keys.json)")
     keys, brightness, providers, saver = load_board(args.config)
     config_mtime = os.path.getmtime(args.config)
     with open(PID_FILE, "w") as f:
