@@ -12,11 +12,13 @@ It talks the deck's stock USB HID protocol through `/dev/hidraw*`.
 | `deck.py` | the board: reads `keys.json`, paints keys, runs actions |
 | `keys.json` | your layout, reloaded automatically when saved |
 | `sessions.py` | finds live Claude Code sessions and their state |
+| `settings.py` | settings window (GTK): edit keys.json, start/stop the board, replace the stored image |
 | `hello_deck.py` | the first test: numbered colour tiles, prints key presses |
 
 ## Run
 
 ```
+python3 settings.py        # settings window: keys, screen saver, start/stop the board
 python3 deck.py            # run the board, Ctrl-C resets the deck
 python3 deck.py --demo     # same, with made-up Claude sessions in every state
 python3 sessions.py        # list the Claude Code sessions it would show
@@ -77,6 +79,24 @@ between plugging in and starting deck.py. Nothing is ever written to the deck's
 stored image.
 
 `python3 deck.py --saver` starts straight in saver mode, for checking the look.
+
+## Settings window
+
+`python3 settings.py` opens a GTK window with three pages. General: start or
+stop the board, brightness, screen saver. Keys: a grid laid out like the deck,
+click a key to set its type, label, colour and command. Deck: the device
+details and the stored-image action below. Changes are written to keys.json
+straight away and the running board picks them up.
+
+## The image stored inside the deck
+
+The deck shows a stored picture whenever no program is driving it. Replacing it
+is possible with a documented command, but Elgato does not say which of the
+stored slots is the one shown, and nothing can read a slot back. The Deck page
+of the settings window therefore stops the board, writes your picture to one
+slot at a time, shows the stored image and asks whether the deck now shows your
+picture, then remembers the slot in keys.json for later changes. The previous
+picture is gone once its slot is written.
 
 ## Claude Code session keys
 
