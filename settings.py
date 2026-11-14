@@ -41,6 +41,7 @@ KEY_KINDS = [
     ("counter_done", "Sessions done: count and filter"),
     ("pager_prev", "Sessions: previous page / stats (hold: dismissed)"),
     ("pager_next", "Sessions: next page (hold: brightness)"),
+    ("stats", "Stats page (plan quota, tokens today)"),
 ]
 KIND_INDEX = {k: i for i, (k, _) in enumerate(KEY_KINDS)}
 KIND_LABEL = dict(KEY_KINDS)
@@ -82,7 +83,7 @@ def key_kind(cfg, i):
         return ("mute_source" if k.get("target") == "source" else "mute_sink"), k
     if t == "volume":
         return ("volume_up" if int(k.get("step", 5)) > 0 else "volume_down"), k
-    if t in ("clock", "slack", "todo"):
+    if t in ("clock", "slack", "todo", "stats"):
         return t, k
     if t == "counter":
         return "counter_" + (k.get("state") or "waiting"), k
@@ -105,6 +106,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
         keys[str(i)] = {"type": "slack", **({"team": team} if team else {})}
     elif kind == "todo":
         keys[str(i)] = {"type": "todo", **(todo or {})}
+    elif kind == "stats":
+        keys[str(i)] = {"type": "stats"}
     elif kind.startswith("counter_"):
         keys[str(i)] = {"type": "counter", "state": kind.split("_", 1)[1]}
     elif kind.startswith("pager_"):
@@ -135,6 +138,8 @@ def key_summary(cfg, i):
         return "To-do\n" + os.path.basename(k.get("file") or "todo.md")
     if kind.startswith("counter_"):
         return "Count\n" + kind.split("_", 1)[1]
+    if kind == "stats":
+        return "Stats"
     if kind == "pager_prev":
         return "< page"
     if kind == "pager_next":

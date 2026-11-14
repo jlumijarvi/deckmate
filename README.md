@@ -113,6 +113,7 @@ a plain button with a shell command, or a live key:
 | `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a sub-deck |
 | `counter` (`state`: waiting, running or done) | how many sessions are in that state | filters the board to that state, bright border while on; hold on the done counter hides every done session |
 | `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page, or the stats page from the first; hold shows hidden sessions. next: next page; hold cycles brightness 30 / 60 / 100 |
+| `stats` | percent left in the five-hour plan window | opens the stats page |
 
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
 sessions fill them.
@@ -151,6 +152,24 @@ are the items, overdue first, then by due date, then undated; with more than
 `code`), `soon_days` (0 means only items due today count as "due soon"),
 `hold_done` (default true). Two to-do keys with different files give two lists.
 
+## Stats page
+
+Reached from the previous-page key on the first page, or from a `stats` key.
+Tiles: percent left in the five-hour and seven-day plan windows as the Claude
+desktop app last sampled them (`~/.config/Claude/plan-usage-history.json`; the
+app must have been running recently for the numbers to be fresh), tokens today
+(output large, input and cache writes small), cache reads today with the number
+of replies, and the fullest context among the sessions on the board. Tokens
+are summed over every transcript since local midnight, counted once per
+message id, with per-file read offsets so refreshes are incremental. When a
+plan window resets (the used percent drops by more than 20 between samples)
+the deck pulses cyan and the tile shows "new window" with a cyan border until
+the next sample.
+
+Session keys also carry a small git dot bottom right when the session's folder
+is a repository: hollow for a dirty worktree, filled for clean but ahead of
+upstream, none otherwise. Git runs in a background thread every 30 seconds.
+
 ## Log
 
 The board logs to the journal (`journalctl --user -u stream-deck`) and to
@@ -164,7 +183,8 @@ python3 -m unittest discover -s tests
 
 Covers press and hold detection, dismissal and return, filters, paging, the
 state store, pulse detection and timing, scrolling and breathing, the session
-state classifier, the to-do parser and the Slack parser. `build_deb.sh` runs them and refuses to build on a failure.
+state classifier, the token tally and plan usage, git probing, the to-do parser
+and the Slack parser. `build_deb.sh` runs them and refuses to build on a failure.
 
 ## Screen saver
 

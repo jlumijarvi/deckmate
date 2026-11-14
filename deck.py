@@ -54,6 +54,8 @@ import ctypes.util
 
 from paths import HERE, PID_FILE, STATUS_FILE, STATE_FILE, LOG_FILE, config_path, ensure_dirs
 from board import PressTracker, SessionView, StateStore, Effects, detect_pulses, scroll_offset, breath
+from stats import StatsProvider, fmt_tokens
+from gitinfo import GitWatcher, dot_kind
 import logging
 import logging.handlers
 
@@ -293,6 +295,8 @@ class Volume(Key):
 
 
 
+CYAN = (0, 200, 220)
+
 STATE_COLORS = {
     "waiting": (245, 166, 35),
     "running": (52, 140, 235),
@@ -333,6 +337,7 @@ class SessionBoard:
         self.scanner = SessionScanner()
         self.store = StateStore(STATE_FILE)
         self.view = SessionView(slots, self.store)
+        self.git = GitWatcher()
         self.sessions = []
         self.known_states = {}
         self.pending_pulses = []      # (session, state) found by the last scan
@@ -355,6 +360,8 @@ class SessionBoard:
         self.pending_pulses.extend(pulses)
         for sess in self.sessions:
             self.first_seen.setdefault(sess.session_id, now)
+            if sess.cwd:
+                self.git.want(sess.cwd)
         self.view.update(self.sessions)
 
     def animating(self):
@@ -399,7 +406,7 @@ def title_scrolls(name):
     return title_layout(name) is None
 
 
-def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None):
+def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None):
     """The key image for one session (None -> empty slot)."""
     if s is None:
         return Image.new("RGB", (KEY_PX, KEY_PX), (12, 12, 14))
@@ -431,6 +438,13 @@ def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None):
     bar = (110, 110, 110) if frac < 0.6 else (245, 166, 35) if frac < 0.85 else (220, 60, 60)
     d.rectangle([0, KEY_PX - 3, KEY_PX, KEY_PX], fill=(30, 30, 30))
     d.rectangle([0, KEY_PX - 3, int(KEY_PX * frac), KEY_PX], fill=bar)
+    # git: hollow dot = dirty worktree, filled = clean but ahead of upstream
+    kind = dot_kind(git)
+    if kind:
+        r = 4
+        cx, cy = KEY_PX - 8, KEY_PX - 11
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(200, 200, 210) if kind == "filled" else None,
+                  outline=(200, 200, 210), width=1)
     return img
 
 
@@ -453,7 +467,8 @@ class SessionSlot(Key):
         if s is None:
             return render_session(None, pressed)
         now = time.monotonic()
-        return render_session(s, pressed, scroll_t=now - self.board.first_seen.get(s.session_id, now), now=now)
+        return render_session(s, pressed, scroll_t=now - self.board.first_seen.get(s.session_id, now), now=now,
+                              git=self.board.git.state(s.cwd))
 
     def tap(self):
         s = self.session
@@ -592,35 +607,89 @@ class DismissedPage:
         return keys
 
 
+_stats_provider = None
+
+
+def stats_provider():
+    global _stats_provider
+    if _stats_provider is None:
+        _stats_provider = StatsProvider()
+    return _stats_provider
+
+
 class StatsPage:
-    """Placeholder until the stats tiles land: shows session totals."""
+    """Plan quota windows, tokens today, cache reads, fullest context."""
 
     def __init__(self, board):
         self.board = board
 
     def keys(self):
-        v = self.board.view
+        st = stats_provider()
+        plan, (tin, tout, tcache, msgs) = st.plan, st.tokens()
         keys = [Blank({}) for _ in range(KEY_COUNT)]
         keys[0] = NavKey("<", "back", nav.pop)
-        for n, state in enumerate(("waiting", "running", "done", "stopped", "failed"), start=1):
-            keys[n] = StatTile(state, str(v.count(state)), STATE_COLORS[state])
+        asof = time.strftime("%-d.%-m. %H:%M", time.localtime(plan.sampled_at)) if plan.sampled_at else "no data"
+        for n, (name, title) in enumerate((("fh", "5 hours"), ("sd", "7 days")), start=1):
+            left = plan.left(name)
+            color = CYAN if plan.new_window[name] else (52, 140, 235)
+            keys[n] = StatTile(title, "—" if left is None else f"{left}%",
+                               color, "new window" if plan.new_window[name] else f"left, {asof}",
+                               border=plan.new_window[name])
+        keys[3] = StatTile("tokens today", fmt_tokens(tout), (46, 180, 100),
+                           f"out · in {fmt_tokens(tin)}")
+        keys[4] = StatTile("cache reads", fmt_tokens(tcache), (120, 120, 140), f"today, {msgs} replies")
+        fullest = max((s for s in (self.board.sessions if self.board else []) if s), key=lambda s: s.ctx_fraction, default=None)
+        if fullest:
+            frac = fullest.ctx_fraction
+            color = (110, 110, 110) if frac < 0.6 else (245, 166, 35) if frac < 0.85 else (220, 60, 60)
+            keys[5] = StatTile("context", f"{int(frac * 100)}%", color, fullest.name)
+        else:
+            keys[5] = StatTile("context", "—", (90, 90, 100), "no sessions")
         return keys
 
 
+class StatsKey(Key):
+    """Opens the stats page; shows the five-hour window at a glance."""
+    dynamic = True
+
+    def __init__(self, cfg, board):
+        super().__init__(cfg)
+        self.board = board
+
+    def render(self, pressed):
+        plan = stats_provider().plan
+        left = plan.left("fh")
+        color = CYAN if plan.new_window["fh"] else (52, 140, 235)
+        img, d, fg = tile(dim(color, 0.3), pressed)
+        if not pressed:
+            d.rectangle([0, 0, KEY_PX, 4], fill=color)
+        draw_centered_lines(d, [self.cfg.get("label") or "stats"], fg, size=12, top=9)
+        draw_centered_lines(d, ["—" if left is None else f"{left}%"], fg, size=26, top=24)
+        draw_centered_lines(d, ["5h left"], (200, 200, 210) if not pressed else fg, size=10, top=56, bold=False)
+        return img
+
+    def tap(self):
+        nav.push(StatsPage(self.board))
+
+
 class StatTile(Key):
-    def __init__(self, title, value, color=(90, 90, 100), foot=""):
+    def __init__(self, title, value, color=(90, 90, 100), foot="", border=False):
         super().__init__({})
-        self.title, self.value, self.color, self.foot = title, value, color, foot
+        self.title, self.value, self.color, self.foot, self.border = title, value, color, foot, border
 
     def render(self, pressed):
         img, d, fg = tile(dim(self.color, 0.3), pressed)
         if not pressed:
             d.rectangle([0, 0, KEY_PX, 4], fill=self.color)
-        draw_centered_lines(d, [self.title], fg, size=11, top=9)
+            if self.border:
+                d.rectangle([0, 0, KEY_PX - 1, KEY_PX - 1], outline=self.color, width=3)
+        tl, tsize = fit_lines(self.title, max_lines=1, sizes=(11, 10, 9))
+        draw_centered_lines(d, tl, fg, size=tsize, top=9)
         lines, size = fit_lines(self.value, max_lines=1, sizes=(26, 22, 18, 14, 11))
         draw_centered_lines(d, lines, fg, size=size, top=24)
         if self.foot:
-            draw_centered_lines(d, [self.foot], (200, 200, 210) if not pressed else fg, size=10, top=56, bold=False)
+            lines, fsize = fit_lines(self.foot, max_lines=1, sizes=(10, 9))
+            draw_centered_lines(d, lines, (200, 200, 210) if not pressed else fg, size=fsize, top=56, bold=False)
         return img
 
 
@@ -910,7 +979,7 @@ def load_board(path):
             log.info(f"keys.json: ignoring key {idx}, valid keys are 0..{KEY_COUNT - 1}")
             continue
         ktype = kcfg.get("type", "command")
-        if ktype in ("todo", "counter", "pager"):
+        if ktype in ("todo", "counter", "pager", "stats"):
             keys[i] = (ktype, kcfg)  # resolved below, once the shared objects exist
             continue
         if ktype not in KEY_TYPES:
@@ -920,7 +989,7 @@ def load_board(path):
     providers = []
     region = [int(x) for x in cfg.get("sessions", {}).get("keys", []) if 0 <= int(x) < KEY_COUNT]
     board = None
-    if region or any(isinstance(k, tuple) and k[0] in ("counter", "pager") for k in keys):
+    if region or any(isinstance(k, tuple) and k[0] in ("counter", "pager", "stats") for k in keys):
         board = SessionBoard(len(region) or 1)
         providers.append(board)
         for n, idx in enumerate(region):
@@ -930,6 +999,10 @@ def load_board(path):
             keys[i] = CounterKey(board, k[1].get("state", "waiting"))
         elif isinstance(k, tuple) and k[0] == "pager":
             keys[i] = PagerKey(board, k[1].get("dir", "next"), on_brightness=lambda: cycle_brightness(path))
+        elif isinstance(k, tuple) and k[0] == "stats":
+            keys[i] = StatsKey(k[1], board)
+    if board is not None:
+        providers.append(stats_provider())   # plan usage: watched for window resets (cyan pulse)
     defaults = cfg.get("todo", {})           # optional board-wide defaults for todo keys
     lists = {}                               # one TodoList per file, shared by keys on the same file
     for i, k in enumerate(keys):
@@ -1143,6 +1216,10 @@ def main():
                 log.info(f"pulse: {sess.name} -> {state}")
             if hasattr(p, "pending_pulses"):
                 p.pending_pulses.clear()
+            plan = getattr(p, "plan", None)
+            if plan is not None and plan.reset_events:
+                effects.pulse(now, CYAN)
+                log.info(f"plan window reset: {', '.join(plan.reset_events)}")
         if nav.dirty:
             nav.dirty = False
             sent = [None] * KEY_COUNT
