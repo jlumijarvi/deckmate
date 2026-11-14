@@ -82,7 +82,7 @@ def key_kind(cfg, i):
     return "command", k
 
 
-def set_key(cfg, i, kind, label="", color="#444444", run="", team=None):
+def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None):
     keys = cfg.setdefault("keys", {})
     sess = [s for s in session_keys(cfg) if s != i]
     keys.pop(str(i), None)
@@ -95,7 +95,7 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None):
     elif kind == "slack":
         keys[str(i)] = {"type": "slack", **({"team": team} if team else {})}
     elif kind == "todo":
-        keys[str(i)] = {"type": "todo"}
+        keys[str(i)] = {"type": "todo", **(todo or {})}
     elif kind == "mute_source":
         keys[str(i)] = {"type": "mute", "target": "source", "label": label or "Mic"}
     elif kind == "mute_sink":
@@ -119,7 +119,7 @@ def key_summary(cfg, i):
     if kind == "slack":
         return "Slack\n" + (k.get("team") or "")
     if kind == "todo":
-        return "To-do\nlist"
+        return "To-do\n" + os.path.basename(k.get("file") or "todo.md")
     if kind == "empty":
         return ""
     return KIND_LABEL[kind]
@@ -268,6 +268,27 @@ class KeyDialog(Adw.Dialog):
         self.team_row.set_selected(ids.index(k["team"]) if k.get("team") in ids else 0)
         group.add(self.team_row)
 
+        # to-do list rows
+        self.todo_file = Adw.ActionRow(title="List file")
+        self.todo_file.set_subtitle(k.get("file") or "~/.config/stream-deck/todo.md")
+        btn = Gtk.Button(label="Choose…")
+        btn.set_valign(Gtk.Align.CENTER)
+        btn.connect("clicked", lambda *_: choose_file(self.window, self.on_todo_file, "Choose the to-do list file"))
+        self.todo_file.add_suffix(btn)
+        group.add(self.todo_file)
+        self.todo_open = Adw.EntryRow(title="Open linked files with")
+        self.todo_open.set_text(k.get("open_with") or "code")
+        group.add(self.todo_open)
+        self.todo_soon = Adw.SpinRow.new_with_range(0, 30, 1)
+        self.todo_soon.set_title("Days ahead that count as due soon")
+        self.todo_soon.set_subtitle("0: only items due today turn the key amber")
+        self.todo_soon.set_value(float(k.get("soon_days", 0) or 0))
+        group.add(self.todo_soon)
+        self.todo_hold = Adw.SwitchRow(title="Hold an item's key to mark it done")
+        self.todo_hold.set_subtitle("Ticks the item's box in the list file")
+        self.todo_hold.set_active(bool(k.get("hold_done", True)))
+        group.add(self.todo_hold)
+
         view = Adw.ToolbarView()
         header = Adw.HeaderBar()
         save = Gtk.Button(label="Save")
@@ -282,20 +303,32 @@ class KeyDialog(Adw.Dialog):
     def kind(self):
         return KEY_KINDS[self.kind_row.get_selected()][0]
 
+    def on_todo_file(self, path):
+        self.todo_file.set_subtitle(path)
+
     def update_rows(self):
         kind = self.kind()
-        self.label_row.set_visible(kind in ("command", "mute_source", "mute_sink"))
+        self.label_row.set_visible(kind in ("command", "mute_source", "mute_sink", "todo"))
         self.color_row.set_visible(kind == "command")
         self.run_row.set_visible(kind == "command")
         self.team_row.set_visible(kind == "slack")
+        for row in (self.todo_file, self.todo_open, self.todo_soon, self.todo_hold):
+            row.set_visible(kind == "todo")
 
     def on_save(self, *_):
         rgba = self.color_btn.get_rgba()
         color = "#%02x%02x%02x" % (round(rgba.red * 255), round(rgba.green * 255), round(rgba.blue * 255))
         team = self.workspaces[self.team_row.get_selected()]["id"] if self.workspaces else None
+        label = self.label_row.get_text().replace("\\n", "\n")
+        todo = {
+            "file": self.todo_file.get_subtitle(),
+            "open_with": self.todo_open.get_text().strip() or "code",
+            "soon_days": int(self.todo_soon.get_value()),
+            "hold_done": bool(self.todo_hold.get_active()),
+            **({"label": label} if label.strip() else {}),
+        }
         set_key(self.window.cfg, self.index, self.kind(),
-                label=self.label_row.get_text().replace("\\n", "\n"),
-                color=color, run=self.run_row.get_text(), team=team)
+                label=label, color=color, run=self.run_row.get_text(), team=team, todo=todo)
         self.window.save()
         self.window.refresh_grid()
         self.close()
@@ -406,51 +439,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         page.add(g)
         self.update_saver_rows()
 
-        g = Adw.PreferencesGroup(title="To-do list",
-                                 description="A Markdown task list; the to-do key shows the open items. "
-                                             "One item per line: '- [ ] Title @2026-11-20 [notes](file.md)'.")
-        tcfg = self.cfg.setdefault("todo", {})
-        self.todo_file = Adw.ActionRow(title="List file")
-        self.todo_file.set_subtitle(tcfg.get("file") or "~/.config/stream-deck/todo.md")
-        btn = Gtk.Button(label="Choose…")
-        btn.set_valign(Gtk.Align.CENTER)
-        btn.connect("clicked", lambda *_: choose_file(self, self.on_todo_file, "Choose the to-do list file"))
-        self.todo_file.add_suffix(btn)
-        g.add(self.todo_file)
-        self.todo_open = Adw.EntryRow(title="Open linked files with")
-        self.todo_open.set_text(tcfg.get("open_with") or "code")
-        self.todo_open.connect("changed", self.on_todo_open)
-        g.add(self.todo_open)
-        self.todo_soon = Adw.SpinRow.new_with_range(0, 30, 1)
-        self.todo_soon.set_title("Days ahead that count as due soon")
-        self.todo_soon.set_subtitle("0 means only items due today turn the key amber")
-        self.todo_soon.set_value(float(tcfg.get("soon_days", 0) or 0))
-        self.todo_soon.connect("notify::value", self.on_todo_soon)
-        g.add(self.todo_soon)
-        self.todo_hold = Adw.SwitchRow(title="Hold an item's key to mark it done")
-        self.todo_hold.set_subtitle("Ticks the item's box in the list file")
-        self.todo_hold.set_active(bool(tcfg.get("hold_done", True)))
-        self.todo_hold.connect("notify::active", self.on_todo_hold)
-        g.add(self.todo_hold)
-        page.add(g)
         return page
-
-    def on_todo_hold(self, *_):
-        self.cfg["todo"]["hold_done"] = bool(self.todo_hold.get_active())
-        self.save_soon()
-
-    def on_todo_file(self, path):
-        self.cfg["todo"]["file"] = path
-        self.todo_file.set_subtitle(path)
-        self.save()
-
-    def on_todo_open(self, *_):
-        self.cfg["todo"]["open_with"] = self.todo_open.get_text().strip() or "code"
-        self.save_soon()
-
-    def on_todo_soon(self, *_):
-        self.cfg["todo"]["soon_days"] = int(self.todo_soon.get_value())
-        self.save_soon()
 
     def on_brightness(self, *_):
         self.cfg["brightness"] = int(self.brightness.get_value())

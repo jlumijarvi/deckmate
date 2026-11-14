@@ -8,11 +8,11 @@ Key types (see keys.json):
   volume              step (+/- percent); shows the speaker volume, tap changes it
   slack               unread badge for one workspace ("team": id, default: the first
                       workspace found); tap opens that workspace in Slack
-  todo                open items in the to-do list (a Markdown task list, see todo.py),
+  todo                open items in a to-do list (a Markdown task list, see todo.py),
                       coloured by urgency; tap opens the list as a sub-deck, one key per
-                      item, tap an item to open its linked file. Settings in "todo":
-                      {"file": "~/.config/stream-deck/todo.md", "open_with": "code",
-                       "soon_days": 0}
+                      item, tap an item to open its linked file, hold it to mark it done.
+                      Per key: "file" (default ~/.config/stream-deck/todo.md), "label",
+                      "open_with" (default "code"), "soon_days" (0), "hold_done" (true)
 
 A "screensaver" entry: {"image": "clock" | "/path/to/picture", "timeout_min": 5,
 "sleep_min": 0}. After timeout_min idle minutes the whole screen shows the picture
@@ -634,19 +634,20 @@ def load_board(path):
             continue
         keys[i] = KEY_TYPES[ktype](kcfg)
     providers = []
-    tcfg = cfg.get("todo", {})
-    todo_list = None
+    defaults = cfg.get("todo", {})           # optional board-wide defaults for todo keys
+    lists = {}                               # one TodoList per file, shared by keys on the same file
     for i, k in enumerate(keys):
         if isinstance(k, tuple):
-            if todo_list is None:
-                todo_list = TodoList(tcfg.get("file") or os.path.join(CONFIG_DIR, "todo.md"),
-                                     tcfg.get("soon_days", 0))
+            kcfg = {**defaults, **k[1]}
+            path = os.path.expanduser(kcfg.get("file") or os.path.join(CONFIG_DIR, "todo.md"))
+            if path not in lists:
+                lists[path] = TodoList(path, kcfg.get("soon_days", 0))
                 try:
-                    todo_list.ensure_file()
+                    lists[path].ensure_file()
                 except OSError as e:
-                    print(f"todo: cannot create {todo_list.path}: {e}")
-                providers.append(todo_list)
-            keys[i] = TodoKey({**tcfg, **k[1]}, todo_list)
+                    print(f"todo: cannot create {path}: {e}")
+                providers.append(lists[path])
+            keys[i] = TodoKey(kcfg, lists[path])
     region = cfg.get("sessions", {}).get("keys", [])
     if region:
         board = SessionBoard()

@@ -144,10 +144,10 @@ done" in the settings turns that off.
 
 Tapping the key opens the list as a sub-deck: key 0 goes back, the other keys
 are the items, overdue first, then by due date, then undated; with more than
-14 items keys 13 and 14 turn the pages. Settings (`"todo"` in keys.json, or
-the General page of the settings window): `file`, `open_with` (default
+14 items keys 13 and 14 turn the pages. The settings live on the key itself
+(click it in the settings window): `file`, `label`, `open_with` (default
 `code`), `soon_days` (0 means only items due today count as "due soon"),
-`hold_done` (default true).
+`hold_done` (default true). Two to-do keys with different files give two lists.
 
 ## Screen saver
 

@@ -43,11 +43,5 @@
     "image": "clock",
     "timeout_min": 5,
     "sleep_min": 0
-  },
-  "todo": {
-    "file": "~/.config/stream-deck/todo.md",
-    "open_with": "code",
-    "soon_days": 0,
-    "hold_done": true
   }
 }
