@@ -1,5 +1,5 @@
 {
-  "brightness": 60,
+  "brightness": 70,
   "keys": {
     "0": {
       "type": "clock"
@@ -42,6 +42,6 @@
   "screensaver": {
     "image": "clock",
     "timeout_min": 5,
-    "sleep_min": 0
+    "sleep_min": 60
   }
 }
