@@ -8,6 +8,7 @@ Starts at login from /etc/xdg/autostart when installed from the package.
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -91,7 +92,7 @@ class Tray:
         self.ind.set_title("Stream Deck")
         self.ind.set_attention_icon_full(ICON_ATTENTION, "A Claude session is waiting for you")
         self.ind.set_status(AppIndicator.IndicatorStatus.ACTIVE)
-        self.update = None  # (tag, deb url) when a newer release is known
+        self.update = None  # (tag, deb url, asset name, via_gh) when a newer release is known
 
         self.menu = Gtk.Menu()
         self.status_item = Gtk.MenuItem(label="Board: …")
@@ -190,29 +191,42 @@ class Tray:
         else:
             self.check_updates(quiet=False)
 
+    @staticmethod
+    def latest_release():
+        """(release json, via_gh). Public repo: the GitHub API. Private repo: the gh
+        tool, if it is installed and logged in (`gh auth login`)."""
+        url = f"https://api.github.com/repos/{REPO}/releases/latest"
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
+                                                       "User-Agent": "stream-deck-tray"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return json.load(r), False
+        except urllib.error.HTTPError as e:
+            if e.code not in (401, 403, 404) or not shutil.which("gh"):
+                raise
+        r = sh("gh", "api", f"repos/{REPO}/releases/latest", timeout=30)
+        if r is None or r.returncode != 0:
+            raise RuntimeError("private repository: run `gh auth login` once, or make it public")
+        return json.loads(r.stdout), True
+
     def check_updates(self, quiet):
         def work():
             try:
-                req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
-                                             headers={"Accept": "application/vnd.github+json",
-                                                      "User-Agent": "stream-deck-tray"})
-                with urllib.request.urlopen(req, timeout=15) as r:
-                    rel = json.load(r)
+                rel, via_gh = self.latest_release()
                 tag = rel.get("tag_name", "")
-                deb = next((a["browser_download_url"] for a in rel.get("assets", [])
-                            if a.get("name", "").endswith(".deb")), None)
-                GLib.idle_add(self.update_result, tag, deb, quiet, None)
+                asset = next((a for a in rel.get("assets", []) if a.get("name", "").endswith(".deb")), None)
+                GLib.idle_add(self.update_result, tag, asset, via_gh, quiet, None)
             except Exception as e:  # network down, no releases yet, rate limit
-                GLib.idle_add(self.update_result, None, None, quiet, str(e))
+                GLib.idle_add(self.update_result, None, None, False, quiet, str(e))
         threading.Thread(target=work, daemon=True).start()
 
-    def update_result(self, tag, deb, quiet, error):
+    def update_result(self, tag, asset, via_gh, quiet, error):
         if error or not tag:
             if not quiet:
                 notify("Stream Deck: no update information", error or "no releases found")
             return False
-        if version_tuple(tag) > version_tuple(version()) and deb:
-            self.update = (tag, deb)
+        if version_tuple(tag) > version_tuple(version()) and asset:
+            self.update = (tag, asset["browser_download_url"], asset["name"], via_gh)
             self.update_item.set_label(f"Update to {tag}…")
             notify(f"Stream Deck {tag} is available", "Use the tray menu to install it.")
         else:
@@ -223,14 +237,20 @@ class Tray:
         return False
 
     def install_update(self):
-        tag, url = self.update
+        tag, url, name, via_gh = self.update
         cache = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "stream-deck")
         os.makedirs(cache, exist_ok=True)
-        path = os.path.join(cache, f"stream-deck_{tag.lstrip('v')}_all.deb")
+        path = os.path.join(cache, name)
 
         def work():
             try:
-                urllib.request.urlretrieve(url, path)
+                if via_gh:
+                    r = sh("gh", "release", "download", tag, "--repo", REPO, "--pattern", name,
+                           "--dir", cache, "--clobber", timeout=120)
+                    if r is None or r.returncode != 0:
+                        raise RuntimeError((r.stderr if r else "gh failed").strip()[-200:])
+                else:
+                    urllib.request.urlretrieve(url, path)
             except Exception as e:
                 GLib.idle_add(notify, "Stream Deck update failed", f"download: {e}")
                 return
