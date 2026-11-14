@@ -53,7 +53,7 @@ import ctypes
 import ctypes.util
 
 from paths import HERE, PID_FILE, STATUS_FILE, STATE_FILE, LOG_FILE, config_path, ensure_dirs
-from board import PressTracker, SessionView, StateStore
+from board import PressTracker, SessionView, StateStore, Effects, detect_pulses, scroll_offset, breath
 import logging
 import logging.handlers
 
@@ -78,7 +78,9 @@ def setup_logging():
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FONT_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 RECONNECT_S = 2.0
-REFRESH_S = 1.0
+REFRESH_S = 1.0      # data refresh and static repaint
+FRAME_S = 0.05       # repaint interval while something animates
+SCROLL_PX_S = 30.0
 HOLD_S = 0.6     # a press this long is a hold, for keys that have a hold action
 
 _fonts = {}
@@ -309,11 +311,12 @@ DEMO = False
 
 def demo_sessions():
     now = time.time()
+    phase = int(time.monotonic() // 10) % 3   # the first session cycles running -> done -> waiting
     mk = lambda name, state, kind, ago, ctx: Session(
-        pid=0, session_id="", name=name, cwd="", state=state, waiting_kind=kind,
+        pid=0, session_id="demo-" + name, name=name, cwd="", state=state, waiting_kind=kind,
         since=now - ago, ctx_used=ctx, ctx_window=1_000_000, transcript="")
     return sorted([
-        mk("Korg CX-3 web MIDI app", "waiting", "!", 95, 240_000),
+        mk("Korg CX-3 web MIDI app", ("running", "done", "waiting")[phase], ("", "", "!")[phase], 95, 240_000),
         mk("Yamaha CK remaining work", "waiting", "?", 12, 610_000),
         mk("Stream Deck tweaking project overview", "running", "", 240, 120_000),
         mk("Encrypted SSD migration to Ubuntu", "done", "", 4000, 900_000),
@@ -331,8 +334,16 @@ class SessionBoard:
         self.store = StateStore(STATE_FILE)
         self.view = SessionView(slots, self.store)
         self.sessions = []
+        self.known_states = {}
+        self.pending_pulses = []      # (session, state) found by the last scan
+        self.first_seen = {}          # session_id -> monotonic time, for the scroll clock
+        self._last_scan = 0.0
 
     def refresh(self):
+        now = time.monotonic()
+        if now - self._last_scan < REFRESH_S:
+            return
+        self._last_scan = now
         if DEMO:
             self.sessions = demo_sessions()
         else:
@@ -340,15 +351,63 @@ class SessionBoard:
                 self.sessions = self.scanner.scan()
             except Exception as e:  # a half-written file must not kill the board
                 log.info(f"session scan failed: {e}")
+        pulses, self.known_states = detect_pulses(self.known_states, self.sessions)
+        self.pending_pulses.extend(pulses)
+        for sess in self.sessions:
+            self.first_seen.setdefault(sess.session_id, now)
         self.view.update(self.sessions)
 
+    def animating(self):
+        """True while a visible session key needs frequent repaints."""
+        for sess in self.view.visible():
+            if sess is None:
+                continue
+            if sess.state == "running":
+                return True
+            if title_scrolls(sess.name):
+                return True
+        return False
 
-def render_session(s, pressed, hidden=False):
+
+def title_layout(name):
+    """(lines, size) for a static title, or None when it should scroll instead:
+    anything that needs more than two lines or less than 11 px."""
+    lines, size = fit_lines(name, max_lines=2, sizes=(13, 12, 11))
+    f = font(size)
+    truncated = lines and lines[-1].endswith("…") and not name.endswith("…")
+    if not truncated and len(lines) <= 2 and all(f.getlength(line) <= KEY_PX - 6 for line in lines):
+        return lines, size
+    return None
+
+
+_title_strips = {}
+
+
+def title_strip(name, size=13):
+    """One-line rendering of a title, cached: (RGBA image, width)."""
+    key = (name, size)
+    if key not in _title_strips:
+        f = font(size)
+        w = int(f.getlength(name)) + 2
+        img = Image.new("RGBA", (w, size + 6), (0, 0, 0, 0))
+        ImageDraw.Draw(img).text((1, 0), name, font=f, fill=(255, 255, 255, 255))
+        _title_strips[key] = (img, w)
+    return _title_strips[key]
+
+
+def title_scrolls(name):
+    return title_layout(name) is None
+
+
+def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None):
     """The key image for one session (None -> empty slot)."""
     if s is None:
         return Image.new("RGB", (KEY_PX, KEY_PX), (12, 12, 14))
     color = STATE_COLORS.get(s.state, (120, 120, 120))
-    img, d, fg = tile(dim(color, 0.12 if hidden else 0.22), pressed)
+    factor = 0.12 if hidden else 0.22
+    if s.state == "running" and not hidden and not pressed:
+        factor = breath(now if now is not None else time.monotonic())   # slow breathing blue
+    img, d, fg = tile(dim(color, factor), pressed)
     if not pressed:
         d.rectangle([0, 0, KEY_PX, 4], fill=dim(color, 0.5) if hidden else color)
     info = font(11)
@@ -357,8 +416,17 @@ def render_session(s, pressed, hidden=False):
     t = elapsed_text(s.since)
     d.text((KEY_PX - 4 - d.textlength(t, font=info), 7), t, font=info,
            fill=(200, 200, 200) if not pressed else fg)
-    lines, size = fit_lines(s.name, sizes=(13, 12, 11, 10, 9))
-    draw_centered_lines(d, lines, (150, 150, 160) if hidden and not pressed else fg, size=size, top=21)
+    title_fg = (150, 150, 160) if hidden and not pressed else fg
+    layout = title_layout(s.name)
+    if layout is not None:
+        lines, size = layout
+        draw_centered_lines(d, lines, title_fg, size=size, top=21 if len(lines) > 1 else 29)
+    else:
+        strip, w = title_strip(s.name)
+        off = scroll_offset(scroll_t, w, KEY_PX - 6, speed=SCROLL_PX_S)
+        view = strip.crop((off, 0, off + KEY_PX - 6, strip.height))
+        tinted = Image.new("RGB", view.size, title_fg)
+        img.paste(tinted, (3, 29), view)
     frac = s.ctx_fraction
     bar = (110, 110, 110) if frac < 0.6 else (245, 166, 35) if frac < 0.85 else (220, 60, 60)
     d.rectangle([0, KEY_PX - 3, KEY_PX, KEY_PX], fill=(30, 30, 30))
@@ -381,7 +449,11 @@ class SessionSlot(Key):
         return self.board.view.visible()[self.index]
 
     def render(self, pressed):
-        return render_session(self.session, pressed)
+        s = self.session
+        if s is None:
+            return render_session(None, pressed)
+        now = time.monotonic()
+        return render_session(s, pressed, scroll_t=now - self.board.first_seen.get(s.session_id, now), now=now)
 
     def tap(self):
         s = self.session
@@ -1040,15 +1112,43 @@ def main():
     seat_paused = False
     next_seat_check = 0.0
 
+    effects = Effects(COLS)
+
+    def apply_overlays(images, now):
+        """Pulse bands and glows on top of the rendered keys."""
+        for i in range(KEY_COUNT):
+            for kind, color, strength in effects.overlays(now, i):
+                base = images[i]
+                if kind == "band":
+                    layer = Image.new("RGB", base.size, color)
+                    images[i] = Image.blend(base, layer, 0.55 * strength)
+                elif kind == "glow":
+                    d = ImageDraw.Draw(images[i])
+                    width = max(1, int(round(4 * strength)))
+                    d.rectangle([0, 0, KEY_PX - 1, KEY_PX - 1], outline=color, width=width)
+        return images
+
     def paint(force=False):
         """Render every key, send those that changed."""
         nonlocal sent
+        now = time.monotonic()
         for p in providers:
             p.refresh()
+        # new pulses found by a scan: sweep the deck, glow the key when it is on the board
+        for p in providers:
+            for sess, state in getattr(p, "pending_pulses", []):
+                idx = next((i for i, k in enumerate(nav.keys())
+                            if isinstance(k, SessionSlot) and k.session is sess), None)
+                effects.pulse(now, STATE_COLORS[state], idx)
+                log.info(f"pulse: {sess.name} -> {state}")
+            if hasattr(p, "pending_pulses"):
+                p.pending_pulses.clear()
         if nav.dirty:
             nav.dirty = False
             sent = [None] * KEY_COUNT
         images = [k.render(pressed[i]) for i, k in enumerate(nav.keys())]
+        if effects.active(now):
+            images = apply_overlays(images, now)
         if deck is not None:
             for i, img in enumerate(images):
                 data = Deck.encode_image(img)
@@ -1137,7 +1237,8 @@ def main():
                     log.info("screen saver on")
 
                 if now >= next_refresh:
-                    next_refresh = now + REFRESH_S
+                    animating = effects.active(now) or any(getattr(p, "animating", lambda: False)() for p in providers)
+                    next_refresh = now + (FRAME_S if animating and not saver_active else REFRESH_S)
                     if saver_active:
                         if saver.is_tiles:
                             tiles = saver.render_tiles()

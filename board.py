@@ -173,3 +173,80 @@ class SessionView:
         if self.store is not None:
             self.store.data["dismissed"] = dict(self.dismissed)
             self.store.save()
+
+
+# --- animation helpers (pure functions of time) ---------------------------------
+
+def detect_pulses(previous, sessions):
+    """Compare the last known state per session with the new scan. Returns
+    ([(session, new_state)], new_states_dict). A pulse is due when a known session
+    becomes done, waiting, failed or stopped; starting to run and first sightings
+    are silent."""
+    pulses = []
+    current = {s.session_id: s.state for s in sessions}
+    for s in sessions:
+        before = previous.get(s.session_id)
+        if before is not None and before != s.state and s.state in ("done", "waiting", "failed", "stopped"):
+            pulses.append((s, s.state))
+    return pulses, current
+
+
+class Effects:
+    """Short visual effects: a colour band sweeping across the columns and a glow
+    on one key. Pure bookkeeping; the renderer asks what to draw at time t."""
+    SWEEP_S = 0.6
+    GLOW_S = 1.0
+
+    def __init__(self, cols=5):
+        self.cols = cols
+        self.items = []   # (start, kind, color, key_index)
+
+    def pulse(self, now, color, key_index=None):
+        self.items.append((now, "sweep", color, None))
+        if key_index is not None:
+            self.items.append((now, "glow", color, key_index))
+
+    def active(self, now):
+        self.items = [i for i in self.items if now - i[0] < max(self.SWEEP_S, self.GLOW_S)]
+        return bool(self.items)
+
+    def overlays(self, now, key_index):
+        """[(kind, color, strength 0..1)] to draw on key_index at time now."""
+        out = []
+        col = key_index % self.cols
+        for start, kind, color, idx in self.items:
+            t = now - start
+            if kind == "sweep" and 0 <= t < self.SWEEP_S:
+                pos = t / self.SWEEP_S * self.cols          # 0..cols, the band's leading edge
+                dist = pos - col                             # how far the band is past this column
+                if 0 <= dist < 1.6:
+                    out.append(("band", color, 1.0 - dist / 1.6))
+            elif kind == "glow" and idx == key_index and 0 <= t < self.GLOW_S:
+                out.append(("glow", color, 1.0 - t / self.GLOW_S))
+        return out
+
+
+def scroll_offset(elapsed, text_w, view_w, speed=30.0, pause=2.0, gap=24.0, step=2):
+    """Horizontal offset for a scrolling title, in pixels, quantised to `step`.
+    Stays at 0 for `pause` seconds, scrolls left at `speed` px/s until the text
+    plus `gap` has passed, then repeats. Returns 0 when the text fits."""
+    if text_w <= view_w:
+        return 0
+    travel = text_w + gap
+    cycle = pause + travel / speed
+    t = elapsed % cycle
+    if t < pause:
+        return 0
+    off = (t - pause) * speed
+    off = int(off // step) * step
+    return off if off < travel else 0
+
+
+def breath(now, period=3.0, low=0.16, high=0.30, steps=12):
+    """A slow brightness factor between low and high, quantised so a key is only
+    re-sent `steps` times per period."""
+    import math
+    phase = (now % period) / period
+    v = (1 - math.cos(phase * 2 * math.pi)) / 2       # 0..1..0
+    q = round(v * steps) / steps
+    return low + (high - low) * q

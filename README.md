@@ -163,8 +163,8 @@ python3 -m unittest discover -s tests
 ```
 
 Covers press and hold detection, dismissal and return, filters, paging, the
-state store, the session state classifier, the to-do parser and the Slack
-parser. `build_deb.sh` runs them and refuses to build on a failure.
+state store, pulse detection and timing, scrolling and breathing, the session
+state classifier, the to-do parser and the Slack parser. `build_deb.sh` runs them and refuses to build on a failure.
 
 ## Screen saver
 
