@@ -1,0 +1,47 @@
+{
+  "brightness": 60,
+  "keys": {
+    "0": {
+      "type": "clock"
+    },
+    "1": {
+      "label": "Code\nstream-deck",
+      "color": "#1f6feb",
+      "run": "code ~/Code/stream-deck"
+    },
+    "2": {
+      "label": "Terminal",
+      "color": "#2d333b",
+      "run": "ptyxis --new-window"
+    },
+    "3": {
+      "label": "Files",
+      "color": "#b08968",
+      "run": "xdg-open ~"
+    },
+    "4": {
+      "label": "Browser",
+      "color": "#e36209",
+      "run": "xdg-open https://claude.ai"
+    }
+  },
+  "sessions": {
+    "keys": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14
+    ]
+  },
+  "screensaver": {
+    "image": "clock",
+    "timeout_min": 5,
+    "sleep_min": 0
+  }
+}
