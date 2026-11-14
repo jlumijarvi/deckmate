@@ -39,6 +39,9 @@ from PIL import Image, ImageDraw, ImageFont
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, ROWS, KEY_COUNT, KEY_PX, LCD_W, LCD_H
 from sessions import Session, SessionScanner, elapsed_text
 
+import ctypes
+import ctypes.util
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 PID_FILE = os.path.join(HERE, ".deck.pid")
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -75,6 +78,33 @@ def launch(cmd):
     """Start a command detached from the deck process so it outlives us."""
     subprocess.Popen(cmd, shell=True, start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+_libsystemd = None
+
+
+def seat_active_uid():
+    """uid of the account whose session currently owns the screen (seat0), or None
+    if that cannot be determined. With several Linux accounts logged in, only the
+    active one should drive the deck."""
+    global _libsystemd
+    if _libsystemd is None:
+        name = ctypes.util.find_library("systemd")
+        _libsystemd = ctypes.CDLL(name) if name else False
+    if _libsystemd:
+        uid = ctypes.c_uint()
+        session = ctypes.c_char_p()
+        if _libsystemd.sd_seat_get_active(b"seat0", ctypes.byref(session), ctypes.byref(uid)) >= 0:
+            return uid.value
+        return None
+    try:  # fallback: logind's seat file
+        with open("/run/systemd/seats/seat0") as f:
+            for line in f:
+                if line.startswith("ACTIVE_UID="):
+                    return int(line.split("=", 1)[1])
+    except (OSError, ValueError):
+        pass
+    return None
 
 
 # --- drawing -----------------------------------------------------------------
@@ -478,6 +508,8 @@ def main():
     last_activity = time.monotonic()
     saver_active = False
     saver_sent = None
+    seat_paused = False
+    next_seat_check = 0.0
 
     def paint(force=False):
         """Render every key, send those that changed."""
@@ -515,6 +547,25 @@ def main():
                     saver_sent = None
                 except (OSError, ValueError) as e:
                     print(f"config reload failed: {e}")
+
+            # another account owns the screen: let go of the deck, its own deck.py takes over
+            if now >= next_seat_check:
+                next_seat_check = now + 2.0
+                active = seat_active_uid()
+                inactive = active is not None and active != os.getuid()
+                if inactive and not seat_paused:
+                    print("another account is active, releasing the deck")
+                    seat_paused = True
+                    if deck is not None:
+                        deck.close()
+                        deck = None
+                elif seat_paused and not inactive:
+                    print("this account is active again")
+                    seat_paused = False
+                    last_activity = now
+            if seat_paused:
+                time.sleep(0.5)
+                continue
 
             # (re)connect
             if deck is None and now >= next_open:

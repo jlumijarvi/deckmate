@@ -127,13 +127,25 @@ def board_pid():
     return pid if os.path.exists(f"/proc/{pid}") else None
 
 
+SERVICE = "stream-deck.service"
+
+
+def service_installed():
+    return os.path.exists(os.path.expanduser(f"~/.config/systemd/user/{SERVICE}"))
+
+
 def start_board():
+    if service_installed():
+        subprocess.run(["systemctl", "--user", "start", SERVICE], check=False)
+        return
     subprocess.Popen([sys.executable, DECK_PY], cwd=HERE, start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def stop_board(timeout=5.0):
     pid = board_pid()
+    if service_installed():
+        subprocess.run(["systemctl", "--user", "stop", SERVICE], check=False)
     if pid is None:
         return
     try:
@@ -387,7 +399,8 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def refresh_status(self):
         pid = board_pid()
-        self.status_row.set_subtitle(f"running, pid {pid}" if pid else "not running")
+        how = " (login service)" if service_installed() else ""
+        self.status_row.set_subtitle((f"running, pid {pid}" if pid else "not running") + how)
         self.start_btn.set_sensitive(pid is None)
         self.stop_btn.set_sensitive(pid is not None)
         return True

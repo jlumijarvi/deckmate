@@ -14,6 +14,7 @@ It talks the deck's stock USB HID protocol through `/dev/hidraw*`.
 | `keys.example.json` | the starting layout, used until keys.json exists |
 | `sessions.py` | finds live Claude Code sessions and their state |
 | `settings.py` | settings window (GTK): edit keys.json, start/stop the board, replace the stored image |
+| `install_service.sh` | starts the board at login for the current Linux account (`--remove` undoes it) |
 | `hello_deck.py` | the first test: numbered colour tiles, prints key presses |
 
 ## Run
@@ -29,6 +30,24 @@ python3 deck.py --saver    # start in screen-saver mode
 
 The deck must be plugged in and you must be logged in at the desktop, which is
 what gives your user access to the device node.
+
+## Start at login
+
+```
+./install_service.sh            # install a systemd user service and start it
+./install_service.sh --remove   # stop it and remove it
+systemctl --user status stream-deck
+journalctl --user -u stream-deck -f
+```
+
+The service starts with the graphical session and stops at logout. The Start
+and Stop buttons in the settings window drive the service once it is installed.
+
+Several Linux accounts: home folders are private, so each account needs its own
+copy of this folder (`git clone https://github.com/jlumijarvi/stream-deck`), its
+own keys.json and its own run of install_service.sh. Only the account that
+currently owns the screen drives the deck; when you switch user, the other
+account's board lets go within two seconds and the new one takes over.
 
 ## keys.json
 
