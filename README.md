@@ -20,7 +20,9 @@ its own layout in `~/.config/stream-deck/keys.json`.
 
 The top-bar icon needs GNOME's AppIndicator extension, which Ubuntu enables by
 default. The tray icon checks GitHub once a day for a newer release and offers
-to install it from its menu; the install asks for your password.
+to install it from its menu; the install asks for your password. While the
+repository is private, the check goes through the `gh` tool, so run
+`gh auth login` once in each account.
 
 Command line: `stream-deck settings | board | sessions | tray | --version`.
 
