@@ -1,4 +1,5 @@
-"""A to-do list kept in a Markdown task list, watched for changes. Read-only.
+"""A to-do list kept in a Markdown task list, watched for changes. The only write
+is mark_done(), which ticks one item's box when a key is held.
 
 File format, one item per line:
   - [ ] Title  @2026-11-20  [notes](~/Documents/notes/x.md)
@@ -112,6 +113,32 @@ class TodoList:
         self._key = key
         self.items = parse(text)
         return self.items
+
+    def mark_done(self, item):
+        """Tick the item's box in the file: '- [ ]' -> '- [x]' on its line. Returns
+        True when the line was found unchanged and rewritten."""
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                lines = f.read().split("\n")
+        except OSError:
+            return False
+        if item.line - 1 >= len(lines):
+            return False
+        raw = lines[item.line - 1]
+        m = ITEM_RE.match(raw)
+        if not m or m.group(1).lower() == "x" or item.title not in " ".join(m.group(2).split()):
+            return False  # the file changed under us; do not touch the wrong line
+        box = raw.index("[ ]")
+        lines[item.line - 1] = raw[:box] + "[x]" + raw[box + 3:]
+        tmp = self.path + ".tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+            os.replace(tmp, self.path)
+        except OSError:
+            return False
+        self._key = None  # re-read on the next refresh
+        return True
 
     # -- summary for the badge key --
     def overdue(self, today=None):

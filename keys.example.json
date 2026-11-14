@@ -47,6 +47,7 @@
   "todo": {
     "file": "~/.config/stream-deck/todo.md",
     "open_with": "code",
-    "soon_days": 0
+    "soon_days": 0,
+    "hold_done": true
   }
 }

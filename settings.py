@@ -427,8 +427,17 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.todo_soon.set_value(float(tcfg.get("soon_days", 0) or 0))
         self.todo_soon.connect("notify::value", self.on_todo_soon)
         g.add(self.todo_soon)
+        self.todo_hold = Adw.SwitchRow(title="Hold an item's key to mark it done")
+        self.todo_hold.set_subtitle("Ticks the item's box in the list file")
+        self.todo_hold.set_active(bool(tcfg.get("hold_done", True)))
+        self.todo_hold.connect("notify::active", self.on_todo_hold)
+        g.add(self.todo_hold)
         page.add(g)
         return page
+
+    def on_todo_hold(self, *_):
+        self.cfg["todo"]["hold_done"] = bool(self.todo_hold.get_active())
+        self.save_soon()
 
     def on_todo_file(self, path):
         self.cfg["todo"]["file"] = path

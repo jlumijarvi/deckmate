@@ -58,6 +58,7 @@ FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FONT_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 RECONNECT_S = 2.0
 REFRESH_S = 1.0
+HOLD_S = 0.6     # a press this long is a hold, for keys that have a hold action
 
 _fonts = {}
 
@@ -175,7 +176,8 @@ def fit_lines(label, max_lines=3, sizes=(14, 13, 12, 11, 10, 9), width=KEY_PX - 
 # --- key classes -------------------------------------------------------------
 
 class Key:
-    dynamic = False  # True: re-render on every refresh tick
+    dynamic = False   # True: re-render on every refresh tick
+    holdable = False  # True: tap fires on release, hold() fires after HOLD_S
 
     def __init__(self, cfg):
         self.cfg = cfg
@@ -185,6 +187,13 @@ class Key:
 
     def tap(self):
         pass
+
+    def hold(self):
+        pass
+
+    def render_held(self):
+        """What to show right after hold() ran."""
+        return self.render(True)
 
 
 class Blank(Key):
@@ -534,6 +543,8 @@ class TodoItemKey(Key):
     def __init__(self, item, todo, cfg):
         super().__init__(cfg)
         self.item, self.todo = item, todo
+        self.holdable = bool(cfg.get("hold_done", True))
+        self.done = False
 
     def render(self, pressed):
         urgency = item_urgency(self.item, self.todo.soon_days)
@@ -561,6 +572,15 @@ class TodoItemKey(Key):
             path = os.path.join(os.path.dirname(self.todo.path), path)
         opener = self.cfg.get("open_with") or "code"
         launch(f"{opener} {shlex.quote(path)}")
+
+    def hold(self):
+        self.done = self.todo.mark_done(self.item)
+        print(f"todo: {'done' if self.done else 'could not mark'}: {self.item.title}")
+
+    def render_held(self):
+        img, d, fg = tile((40, 120, 60) if self.done else (120, 40, 40), False)
+        draw_centered_lines(d, ["done" if self.done else "not", "" if self.done else "changed"], fg, size=16, top=20)
+        return img
 
 
 class TodoPage:
@@ -788,6 +808,9 @@ def main():
 
     deck = None
     pressed = [False] * KEY_COUNT
+    press_key = [None] * KEY_COUNT   # the Key object under a finger, for holdable keys
+    press_at = [0.0] * KEY_COUNT
+    held = [False] * KEY_COUNT
     sent = [None] * KEY_COUNT        # JPEG bytes last sent per key
     next_open = 0.0
     next_refresh = 0.0
@@ -928,6 +951,19 @@ def main():
                             previewed = True
                     write_status(True)
 
+                # holds: a holdable key kept down past HOLD_S fires once
+                for i in range(KEY_COUNT):
+                    k = press_key[i]
+                    if k is not None and not held[i] and time.monotonic() - press_at[i] >= HOLD_S:
+                        held[i] = True
+                        try:
+                            k.hold()
+                        except Exception as e:
+                            print(f"key {i} hold failed: {e}")
+                        data = Deck.encode_image(k.render_held())
+                        deck.set_key_jpeg(i, data)
+                        sent[i] = data
+
                 states = deck.read_keys(0.05)
                 if states is not None:
                     if any(states):
@@ -945,18 +981,34 @@ def main():
                             next_refresh = time.monotonic() + REFRESH_S
                         continue
                     for i, (was, is_now) in enumerate(zip(pressed, states)):
-                        if was != is_now:
-                            pressed[i] = is_now
-                            if is_now:
-                                print(f"key {i} tap")
-                                try:
-                                    nav.keys()[i].tap()
-                                except Exception as e:  # a bad command must not kill the board
-                                    print(f"key {i} action failed: {e}")
-                            if nav.dirty:
-                                paint()        # a page changed: redraw everything now
-                                continue
-                            data = Deck.encode_image(nav.keys()[i].render(is_now))
+                        if was == is_now:
+                            continue
+                        pressed[i] = is_now
+                        key = nav.keys()[i]
+                        fire = None
+                        if is_now:
+                            if key.holdable:
+                                press_key[i], press_at[i], held[i] = key, time.monotonic(), False
+                            else:
+                                fire = key
+                        else:
+                            k = press_key[i]
+                            press_key[i] = None
+                            if k is not None and not held[i]:
+                                fire = k          # short press of a holdable key: tap on release
+                            if k is not None and held[i]:
+                                sent[i] = None    # drop the hold feedback on release
+                        if fire is not None:
+                            print(f"key {i} tap")
+                            try:
+                                fire.tap()
+                            except Exception as e:  # a bad command must not kill the board
+                                print(f"key {i} action failed: {e}")
+                        if nav.dirty:
+                            paint()        # a page changed: redraw everything now
+                            continue
+                        data = Deck.encode_image(nav.keys()[i].render(is_now))
+                        if data != sent[i]:
                             deck.set_key_jpeg(i, data)
                             sent[i] = data
             except OSError as e:

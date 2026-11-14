@@ -137,13 +137,17 @@ item per line:
 
 `@date` is the due date, a Markdown link (or a bare path ending in .md) is
 opened when the item's key is tapped. The file is watched, so saving it in an
-editor updates the deck within a second. The deck never writes to it.
+editor updates the deck within a second. Holding an item's key for about half
+a second ticks its box in the file (`- [ ]` becomes `- [x]`), which is the only
+write the deck ever makes to it; the switch "Hold an item's key to mark it
+done" in the settings turns that off.
 
 Tapping the key opens the list as a sub-deck: key 0 goes back, the other keys
 are the items, overdue first, then by due date, then undated; with more than
 14 items keys 13 and 14 turn the pages. Settings (`"todo"` in keys.json, or
 the General page of the settings window): `file`, `open_with` (default
-`code`), `soon_days` (0 means only items due today count as "due soon").
+`code`), `soon_days` (0 means only items due today count as "due soon"),
+`hold_done` (default true).
 
 ## Screen saver
 
