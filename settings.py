@@ -35,6 +35,7 @@ KEY_KINDS = [
     ("volume_up", "Volume up"),
     ("session", "Claude session slot"),
     ("slack", "Slack unread badge"),
+    ("todo", "To-do list"),
 ]
 KIND_INDEX = {k: i for i, (k, _) in enumerate(KEY_KINDS)}
 KIND_LABEL = dict(KEY_KINDS)
@@ -76,7 +77,7 @@ def key_kind(cfg, i):
         return ("mute_source" if k.get("target") == "source" else "mute_sink"), k
     if t == "volume":
         return ("volume_up" if int(k.get("step", 5)) > 0 else "volume_down"), k
-    if t in ("clock", "slack"):
+    if t in ("clock", "slack", "todo"):
         return t, k
     return "command", k
 
@@ -93,6 +94,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None):
         keys[str(i)] = {"type": "clock"}
     elif kind == "slack":
         keys[str(i)] = {"type": "slack", **({"team": team} if team else {})}
+    elif kind == "todo":
+        keys[str(i)] = {"type": "todo"}
     elif kind == "mute_source":
         keys[str(i)] = {"type": "mute", "target": "source", "label": label or "Mic"}
     elif kind == "mute_sink":
@@ -115,6 +118,8 @@ def key_summary(cfg, i):
         return "Claude\nsession"
     if kind == "slack":
         return "Slack\n" + (k.get("team") or "")
+    if kind == "todo":
+        return "To-do\nlist"
     if kind == "empty":
         return ""
     return KIND_LABEL[kind]
@@ -192,6 +197,20 @@ def choose_image(parent, callback):
     filters.append(f)
     dlg.set_filters(filters)
     dlg.set_default_filter(f)
+
+    def done(d, res):
+        try:
+            gfile = d.open_finish(res)
+        except GLib.Error:
+            return
+        if gfile is not None:
+            callback(gfile.get_path())
+    dlg.open(parent, None, done)
+
+
+def choose_file(parent, callback, title="Choose a file"):
+    dlg = Gtk.FileDialog()
+    dlg.set_title(title)
 
     def done(d, res):
         try:
@@ -386,7 +405,43 @@ class SettingsWindow(Adw.ApplicationWindow):
         g.add(self.saver_sleep)
         page.add(g)
         self.update_saver_rows()
+
+        g = Adw.PreferencesGroup(title="To-do list",
+                                 description="A Markdown task list; the to-do key shows the open items. "
+                                             "One item per line: '- [ ] Title @2026-11-20 [notes](file.md)'.")
+        tcfg = self.cfg.setdefault("todo", {})
+        self.todo_file = Adw.ActionRow(title="List file")
+        self.todo_file.set_subtitle(tcfg.get("file") or "~/.config/stream-deck/todo.md")
+        btn = Gtk.Button(label="Choose…")
+        btn.set_valign(Gtk.Align.CENTER)
+        btn.connect("clicked", lambda *_: choose_file(self, self.on_todo_file, "Choose the to-do list file"))
+        self.todo_file.add_suffix(btn)
+        g.add(self.todo_file)
+        self.todo_open = Adw.EntryRow(title="Open linked files with")
+        self.todo_open.set_text(tcfg.get("open_with") or "code")
+        self.todo_open.connect("changed", self.on_todo_open)
+        g.add(self.todo_open)
+        self.todo_soon = Adw.SpinRow.new_with_range(0, 30, 1)
+        self.todo_soon.set_title("Days ahead that count as due soon")
+        self.todo_soon.set_subtitle("0 means only items due today turn the key amber")
+        self.todo_soon.set_value(float(tcfg.get("soon_days", 0) or 0))
+        self.todo_soon.connect("notify::value", self.on_todo_soon)
+        g.add(self.todo_soon)
+        page.add(g)
         return page
+
+    def on_todo_file(self, path):
+        self.cfg["todo"]["file"] = path
+        self.todo_file.set_subtitle(path)
+        self.save()
+
+    def on_todo_open(self, *_):
+        self.cfg["todo"]["open_with"] = self.todo_open.get_text().strip() or "code"
+        self.save_soon()
+
+    def on_todo_soon(self, *_):
+        self.cfg["todo"]["soon_days"] = int(self.todo_soon.get_value())
+        self.save_soon()
 
     def on_brightness(self, *_):
         self.cfg["brightness"] = int(self.brightness.get_value())

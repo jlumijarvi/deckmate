@@ -42,6 +42,7 @@ release with the package attached, which is what the tray icons look for.
 | `keys.example.json` | the starting layout, used until keys.json exists |
 | `sessions.py` | finds live Claude Code sessions and their state |
 | `slackstate.py` | reads Slack's local state file for the unread badge |
+| `todo.py` | parses and watches the Markdown to-do list |
 | `settings.py` | settings window (GTK): edit keys.json, start/stop the board, replace the stored image |
 | `tray.py` | top-bar icon (GTK 3 + AppIndicator) with status, start/stop, settings and updates |
 | `paths.py` | where config, pid and status files live |
@@ -109,6 +110,7 @@ a plain button with a shell command, or a live key:
 | `mute` | mic or speaker, on or MUTED | toggles it (PipeWire, `wpctl`) |
 | `volume` | speaker volume | changes it by `step` percent |
 | `slack` | workspace name and a badge with the number of conversations that have unread messages, plus `@n` for mentions and DMs | opens that workspace in Slack |
+| `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a sub-deck |
 
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
 sessions fill them.
@@ -119,6 +121,29 @@ numbers come from Slack's own state file (`root-state.json` under
 `~/snap/slack/`, `~/.config/Slack/` or the flatpak folder), which holds only
 per-workspace totals, so a per-channel badge is not possible from it. Nothing
 is written to Slack's files and no Slack login is used.
+
+## To-do list
+
+The `todo` key reads a Markdown task list, by default
+`~/.config/stream-deck/todo.md` (created with an example on first use). One
+item per line:
+
+```markdown
+- [ ] Renew passport  @2026-11-20  [notes](~/Documents/notes/passport.md)
+- [ ] Call the garage  @2026-11-16
+- [ ] Sort out the backup disk
+- [x] Done items are hidden
+```
+
+`@date` is the due date, a Markdown link (or a bare path ending in .md) is
+opened when the item's key is tapped. The file is watched, so saving it in an
+editor updates the deck within a second. The deck never writes to it.
+
+Tapping the key opens the list as a sub-deck: key 0 goes back, the other keys
+are the items, overdue first, then by due date, then undated; with more than
+14 items keys 13 and 14 turn the pages. Settings (`"todo"` in keys.json, or
+the General page of the settings window): `file`, `open_with` (default
+`code`), `soon_days` (0 means only items due today count as "due soon").
 
 ## Screen saver
 

@@ -8,6 +8,11 @@ Key types (see keys.json):
   volume              step (+/- percent); shows the speaker volume, tap changes it
   slack               unread badge for one workspace ("team": id, default: the first
                       workspace found); tap opens that workspace in Slack
+  todo                open items in the to-do list (a Markdown task list, see todo.py),
+                      coloured by urgency; tap opens the list as a sub-deck, one key per
+                      item, tap an item to open its linked file. Settings in "todo":
+                      {"file": "~/.config/stream-deck/todo.md", "open_with": "code",
+                       "soon_days": 0}
 
 A "screensaver" entry: {"image": "clock" | "/path/to/picture", "timeout_min": 5,
 "sleep_min": 0}. After timeout_min idle minutes the whole screen shows the picture
@@ -41,6 +46,8 @@ from PIL import Image, ImageDraw, ImageFont
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, ROWS, KEY_COUNT, KEY_PX, LCD_W, LCD_H
 from sessions import Session, SessionScanner, elapsed_text
 from slackstate import SlackState, SNAP_ICON
+from todo import TodoList, due_text
+from paths import CONFIG_DIR
 
 import ctypes
 import ctypes.util
@@ -418,6 +425,174 @@ class Slack(Key):
             launch(f"xdg-open 'slack://open?team={ws['id']}'")
 
 
+
+# --- pages (sub-decks) ---------------------------------------------------------
+
+class Navigator:
+    """The main board plus a stack of pages opened on top of it."""
+
+    def __init__(self, main_keys):
+        self.main = main_keys
+        self.stack = []
+        self.dirty = False
+
+    def keys(self):
+        return self.stack[-1].keys() if self.stack else self.main
+
+    def push(self, page):
+        self.stack.append(page)
+        self.dirty = True
+
+    def pop(self):
+        if self.stack:
+            self.stack.pop()
+            self.dirty = True
+
+    def home(self):
+        self.stack.clear()
+        self.dirty = True
+
+
+nav = None  # set in main()
+
+
+class NavKey(Key):
+    """Back / previous page / next page."""
+
+    def __init__(self, symbol, label, action):
+        super().__init__({})
+        self.symbol, self.label, self.action = symbol, label, action
+
+    def render(self, pressed):
+        img, d, fg = tile((36, 36, 44), pressed)
+        draw_centered_lines(d, [self.symbol], fg, size=30, top=10)
+        draw_centered_lines(d, [self.label], (170, 170, 180) if not pressed else fg, size=11, top=50, bold=False)
+        return img
+
+    def tap(self):
+        self.action()
+
+
+# --- to-do list ----------------------------------------------------------------
+
+URGENCY_COLORS = {
+    "overdue": (220, 60, 60),
+    "soon": (245, 166, 35),
+    "ok": (52, 140, 235),
+    "empty": (110, 110, 120),
+}
+
+
+def item_urgency(item, soon_days):
+    n = item.days_left()
+    if n is None:
+        return "none"
+    if n < 0:
+        return "overdue"
+    if n <= soon_days:
+        return "soon"
+    return "ok"
+
+
+class TodoKey(Key):
+    """Badge: number of open items, coloured by the most urgent one."""
+    dynamic = True
+
+    def __init__(self, cfg, todo):
+        super().__init__(cfg)
+        self.todo = todo
+
+    def render(self, pressed):
+        t = self.todo
+        urgency = t.urgency()
+        color = URGENCY_COLORS[urgency]
+        img, d, fg = tile(dim(color, 0.35), pressed)
+        if not pressed:
+            d.rectangle([0, 0, KEY_PX, 4], fill=color)
+        draw_centered_lines(d, [self.cfg.get("label") or "To do"], fg, size=12, top=9)
+        if not t.exists:
+            draw_centered_lines(d, ["no file"], fg, size=11, top=40, bold=False)
+            return img
+        draw_centered_lines(d, [str(len(t.items))], fg, size=28, top=24)
+        late, soon = len(t.overdue()), len(t.soon())
+        if late:
+            foot = f"{late} late"
+        elif soon:
+            foot = "due today" if t.soon_days == 0 else f"{soon} due soon"
+        elif t.next_due():
+            foot = "next " + due_text(t.next_due())
+        else:
+            foot = ""
+        draw_centered_lines(d, [foot], (230, 230, 235) if not pressed else fg, size=10, top=56, bold=False)
+        return img
+
+    def tap(self):
+        nav.push(TodoPage(self.todo, self.cfg))
+
+
+class TodoItemKey(Key):
+    def __init__(self, item, todo, cfg):
+        super().__init__(cfg)
+        self.item, self.todo = item, todo
+
+    def render(self, pressed):
+        urgency = item_urgency(self.item, self.todo.soon_days)
+        color = URGENCY_COLORS.get(urgency, (90, 90, 100))
+        img, d, fg = tile((24, 24, 30), pressed)
+        if not pressed:
+            d.rectangle([0, 0, KEY_PX, 4], fill=color)
+        lines, size = fit_lines(self.item.title, max_lines=3, sizes=(13, 12, 11, 10, 9))
+        draw_centered_lines(d, lines, fg, size=size, top=8)
+        foot = due_text(self.item.due) if self.item.due else ""
+        if foot:
+            f = font(10, False)
+            d.text((4, KEY_PX - 14), foot, font=f, fill=color if not pressed else fg)
+        if self.item.link:
+            f = font(11)
+            d.text((KEY_PX - 4 - d.textlength("»", font=f), KEY_PX - 15), "»", font=f,
+                   fill=(170, 170, 180) if not pressed else fg)
+        return img
+
+    def tap(self):
+        if not self.item.link:
+            return
+        path = os.path.expanduser(self.item.link)
+        if not os.path.isabs(path):
+            path = os.path.join(os.path.dirname(self.todo.path), path)
+        opener = self.cfg.get("open_with") or "code"
+        launch(f"{opener} {shlex.quote(path)}")
+
+
+class TodoPage:
+    """One key per open item, overdue first. Key 0 goes back; with more items than
+    fit, keys 13 and 14 page through them."""
+    PER_PAGE_FULL = KEY_COUNT - 1
+    PER_PAGE_PAGED = KEY_COUNT - 3
+
+    def __init__(self, todo, cfg):
+        self.todo, self.cfg, self.index = todo, cfg, 0
+
+    def keys(self):
+        items = self.todo.items
+        paged = len(items) > self.PER_PAGE_FULL
+        per = self.PER_PAGE_PAGED if paged else self.PER_PAGE_FULL
+        pages = max(1, -(-len(items) // per))
+        self.index = min(self.index, pages - 1)
+        shown = items[self.index * per:(self.index + 1) * per]
+        keys = [Blank({}) for _ in range(KEY_COUNT)]
+        keys[0] = NavKey("<", "back", nav.pop)
+        for n, item in enumerate(shown, start=1):
+            keys[n] = TodoItemKey(item, self.todo, self.cfg)
+        if paged:
+            keys[13] = NavKey("<", f"{self.index + 1}/{pages}", lambda: self.turn(-1))
+            keys[14] = NavKey(">", f"{self.index + 1}/{pages}", lambda: self.turn(1))
+        return keys
+
+    def turn(self, step):
+        self.index = max(0, self.index + step)
+        nav.dirty = True
+
+
 KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume, "slack": Slack}
 
 
@@ -431,11 +606,27 @@ def load_board(path):
             print(f"keys.json: ignoring key {idx}, valid keys are 0..{KEY_COUNT - 1}")
             continue
         ktype = kcfg.get("type", "command")
+        if ktype == "todo":
+            keys[i] = ("todo", kcfg)  # resolved below, once the list exists
+            continue
         if ktype not in KEY_TYPES:
             print(f"keys.json: key {idx} has unknown type {ktype!r}")
             continue
         keys[i] = KEY_TYPES[ktype](kcfg)
     providers = []
+    tcfg = cfg.get("todo", {})
+    todo_list = None
+    for i, k in enumerate(keys):
+        if isinstance(k, tuple):
+            if todo_list is None:
+                todo_list = TodoList(tcfg.get("file") or os.path.join(CONFIG_DIR, "todo.md"),
+                                     tcfg.get("soon_days", 0))
+                try:
+                    todo_list.ensure_file()
+                except OSError as e:
+                    print(f"todo: cannot create {todo_list.path}: {e}")
+                providers.append(todo_list)
+            keys[i] = TodoKey({**tcfg, **k[1]}, todo_list)
     region = cfg.get("sessions", {}).get("keys", [])
     if region:
         board = SessionBoard()
@@ -566,6 +757,8 @@ def main():
     print(f"layout: {args.config}")
     keys, brightness, providers, saver = load_board(args.config)
     config_mtime = os.path.getmtime(args.config)
+    global nav
+    nav = Navigator(keys)
     ensure_dirs()
     with open(PID_FILE, "w") as f:
         f.write(str(os.getpid()))
@@ -608,9 +801,13 @@ def main():
 
     def paint(force=False):
         """Render every key, send those that changed."""
+        nonlocal sent
         for p in providers:
             p.refresh()
-        images = [k.render(pressed[i]) for i, k in enumerate(keys)]
+        if nav.dirty:
+            nav.dirty = False
+            sent = [None] * KEY_COUNT
+        images = [k.render(pressed[i]) for i, k in enumerate(nav.keys())]
         if deck is not None:
             for i, img in enumerate(images):
                 data = Deck.encode_image(img)
@@ -634,6 +831,7 @@ def main():
                 config_mtime = m
                 try:
                     keys, brightness, providers, saver = load_board(args.config)
+                    nav = Navigator(keys)
                     print("config reloaded")
                     if deck is not None:
                         deck.set_brightness(brightness)
@@ -752,10 +950,13 @@ def main():
                             if is_now:
                                 print(f"key {i} tap")
                                 try:
-                                    keys[i].tap()
+                                    nav.keys()[i].tap()
                                 except Exception as e:  # a bad command must not kill the board
                                     print(f"key {i} action failed: {e}")
-                            data = Deck.encode_image(keys[i].render(is_now))
+                            if nav.dirty:
+                                paint()        # a page changed: redraw everything now
+                                continue
+                            data = Deck.encode_image(nav.keys()[i].render(is_now))
                             deck.set_key_jpeg(i, data)
                             sent[i] = data
             except OSError as e:
