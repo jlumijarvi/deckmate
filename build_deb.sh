@@ -10,9 +10,13 @@ LIB="$STAGE/usr/lib/stream-deck"
 mkdir -p "$LIB" "$STAGE/DEBIAN" "$STAGE/usr/bin" "$STAGE/usr/share/applications" \
          "$STAGE/etc/xdg/autostart" "$STAGE/usr/lib/systemd/user" \
          "$STAGE/usr/share/icons/hicolor/scalable/apps"
-for f in deckhid.py deck.py sessions.py slackstate.py settings.py tray.py paths.py keys.example.json VERSION; do
-    cp "$HERE/$f" "$LIB/"
+# every module, so a new file cannot be forgotten; hello_deck.py is a dev-only test
+for f in "$HERE"/*.py "$HERE/keys.example.json" "$HERE/VERSION"; do
+    case "$(basename "$f")" in hello_deck.py) ;; *) cp "$f" "$LIB/" ;; esac
 done
+# the installed board must import cleanly
+PYTHONPATH="$LIB" python3 -c "import deck, settings, tray, sessions, slackstate, todo, paths" 2>/dev/null \
+    || PYTHONPATH="$LIB" python3 -c "import deck, sessions, slackstate, todo, paths" || { echo "staged modules do not import"; exit 1; }
 cp "$HERE/data/stream-deck" "$STAGE/usr/bin/"
 cp "$HERE/data/stream-deck.desktop" "$STAGE/usr/share/applications/"
 cp "$HERE/data/stream-deck-tray.desktop" "$STAGE/etc/xdg/autostart/"
