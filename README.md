@@ -179,34 +179,9 @@ straight away and the running board picks them up.
 
 ## The image stored inside the deck
 
-The deck shows a stored picture whenever no program is driving it. Replacing it
-is possible with a documented command, but Elgato does not say which of the
-stored slots is the one shown, and nothing can read a slot back. The Deck page
-of the settings window therefore stops the board, writes your picture to one
-slot at a time, shows the stored image and asks whether the deck now shows your
-picture, then remembers the slot in keys.json for later changes. The previous
-picture is gone once its slot is written.
+The deck shows a stored picture (the boot logo) whenever no program is driving
+it. Nothing can read it back, and writing it needs Elgato's "Update Boot Logo"
+command, which is not published for this model, so the board leaves it alone.
+The four "background" slots the deck reports are a separate, unused image
+memory on this model: "Show Background by Index" changes nothing on it.
 
-## Claude Code session keys
-
-One key per running Claude Code session, sorted so the ones that need you come
-first. The strip along the top and the tint give the state:
-
-| Colour | State | Meaning |
-| --- | --- | --- |
-| amber `!` | waiting | a permission prompt |
-| amber `?` | waiting | a question or a plan to approve |
-| blue | running | Claude is working |
-| green | done | the turn ended, the result is waiting to be read |
-| grey | stopped | the process is gone |
-| red | failed | the last reply was an API error |
-
-Top right is how long the session has been in that state. The thin bar along
-the bottom is how full the context window is (grey, amber over 60 percent, red
-over 85). Tap opens the session's folder with `code`, which raises the VS Code
-window that already has it.
-
-Everything comes from files Claude Code writes locally, read only:
-`~/.claude/sessions/<pid>.json` for the live processes, and the transcript in
-`~/.claude/projects/` for the state, title and token usage. Nothing calls an
-API or reads credentials.

@@ -537,115 +537,13 @@ class SettingsWindow(Adw.ApplicationWindow):
             self.lcd_gallery = 4
 
         g = Adw.PreferencesGroup(
-            title="Stored image",
-            description="The picture the deck shows on its own, before deck.py starts. It lives inside the "
-                        "deck and cannot be read back, so the current one is lost when replaced. Elgato does not "
-                        "say which of the stored slots is the one shown, so the first replacement tries the "
-                        "slots one at a time and asks you what the deck shows.")
-        self.stored_pic = Adw.ActionRow(title="Picture file")
-        self.stored_pic.set_subtitle(self.cfg.get("stored_image", {}).get("image", "none chosen"))
-        btn = Gtk.Button(label="Choose…")
-        btn.set_valign(Gtk.Align.CENTER)
-        btn.connect("clicked", lambda *_: choose_image(self, self.on_stored_picture))
-        self.stored_pic.add_suffix(btn)
-        g.add(self.stored_pic)
-
-        self.slot_row = Adw.ActionRow(title="Slot that holds the shown image")
-        self.update_slot_row()
-        g.add(self.slot_row)
-
-        self.replace_btn = Gtk.Button(label="Replace the stored image…")
-        self.replace_btn.add_css_class("destructive-action")
-        self.replace_btn.set_halign(Gtk.Align.START)
-        self.replace_btn.set_margin_top(8)
-        self.replace_btn.connect("clicked", self.on_replace_stored)
-        g.add(self.replace_btn)
+            title="Stored image (boot logo)",
+            description="The picture the deck shows on its own, before the board starts. It lives inside "
+                        "the deck and cannot be read back. Replacing it needs the 'Update Boot Logo' command, "
+                        "which Elgato has not published for this model, so this is not available yet. "
+                        "The deck's four 'background' slots are a different thing and do nothing on this model.")
         page.add(g)
         return page
-
-    def update_slot_row(self):
-        slot = self.cfg.get("stored_image", {}).get("slot")
-        self.slot_row.set_subtitle("not known yet" if slot is None else f"slot {slot}")
-
-    def on_stored_picture(self, path):
-        self.cfg.setdefault("stored_image", {})["image"] = path
-        self.stored_pic.set_subtitle(path)
-        self.save()
-
-    def on_replace_stored(self, *_):
-        path = self.cfg.get("stored_image", {}).get("image")
-        if not path or not os.path.exists(path):
-            ask(self, "Choose a picture first", "Pick the picture to store with the Choose button.", [("ok", "OK")], lambda r: None)
-            return
-        ask(self, "Replace the image stored in the deck?",
-            "The current stored image cannot be backed up and will be lost.\n\n"
-            "The board will be stopped while this runs and started again afterwards.",
-            [("cancel", "Cancel"), ("replace", "Replace")],
-            lambda r: self.replace_stored(path) if r == "replace" else None,
-            destructive="replace")
-
-    def replace_stored(self, path):
-        from PIL import Image
-        try:
-            img = Image.open(path).convert("RGB")
-        except (OSError, ValueError) as e:
-            ask(self, "Cannot open the picture", str(e), [("ok", "OK")], lambda r: None)
-            return
-        from deckhid import LCD_W, LCD_H
-        scale = max(LCD_W / img.width, LCD_H / img.height)
-        img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))))
-        x, y = (img.width - LCD_W) // 2, (img.height - LCD_H) // 2
-        data = Deck.encode_screen(img.crop((x, y, x + LCD_W, y + LCD_H)))
-
-        was_running = board_pid() is not None
-        stop_board()
-        try:
-            found = find_deck()
-            if not found:
-                raise OSError("no Stream Deck connected")
-            deck = Deck(found[0])
-        except (OSError, UnsupportedDeck) as e:
-            ask(self, "Cannot open the deck", str(e), [("ok", "OK")], lambda r: None)
-            if was_running:
-                start_board()
-            return
-
-        known = self.cfg.get("stored_image", {}).get("slot")
-        order = ([known] if known is not None else []) + [s for s in range(self.lcd_gallery) if s != known]
-
-        def finish(slot):
-            deck.close()
-            if slot is not None:
-                self.cfg.setdefault("stored_image", {})["slot"] = slot
-                self.save()
-                self.update_slot_row()
-            if was_running:
-                start_board()
-            if slot is None:
-                ask(self, "No slot changed what the deck shows",
-                    "Every stored slot was written but the deck kept showing something else. "
-                    "The firmware may keep its standby image elsewhere.", [("ok", "OK")], lambda r: None)
-
-        def try_slot(n):
-            if n >= len(order):
-                finish(None)
-                return
-            slot = order[n]
-            try:
-                deck.set_background_jpeg(slot, data)
-                time.sleep(0.3)
-                deck.show_logo()
-            except OSError as e:
-                ask(self, "Writing failed", str(e), [("ok", "OK")], lambda r: finish(None))
-                return
-            ask(self, f"Slot {slot} written",
-                "Look at the deck. Does it show your picture now?",
-                [("no", "No, try the next slot"), ("yes", "Yes")],
-                lambda r: finish(slot) if r == "yes" else try_slot(n + 1),
-                default="yes")
-
-        try_slot(0)
-
 
 class App(Adw.Application):
     def __init__(self, screenshot=None, page=None, key=None):
