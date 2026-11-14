@@ -6,6 +6,8 @@ Key types (see keys.json):
   clock               shows time and date, updates every second
   mute                target "source" (mic) or "sink" (speaker); shows state, tap toggles
   volume              step (+/- percent); shows the speaker volume, tap changes it
+  slack               unread badge for one workspace ("team": id, default: the first
+                      workspace found); tap opens that workspace in Slack
 
 A "screensaver" entry: {"image": "clock" | "/path/to/picture", "timeout_min": 5,
 "sleep_min": 0}. After timeout_min idle minutes the whole screen shows the picture
@@ -38,6 +40,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, ROWS, KEY_COUNT, KEY_PX, LCD_W, LCD_H
 from sessions import Session, SessionScanner, elapsed_text
+from slackstate import SlackState, SNAP_ICON
 
 import ctypes
 import ctypes.util
@@ -342,7 +345,80 @@ class SessionSlot(Key):
             launch("code " + shlex.quote(s.cwd))
 
 
-KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume}
+
+_slack_state = None
+
+
+def slack_state():
+    global _slack_state
+    if _slack_state is None:
+        _slack_state = SlackState()
+    return _slack_state
+
+
+class Slack(Key):
+    """Workspace logo, name, and a badge with the number of conversations that
+    have unread messages. Mentions and DMs are shown separately when non-zero."""
+    dynamic = True
+    _logo = None
+
+    def workspace(self):
+        state = slack_state()
+        state.refresh()
+        wss = state.workspaces()
+        team = self.cfg.get("team")
+        if team:
+            for w in wss:
+                if w["id"] == team:
+                    return w
+            return {"id": team, "name": team, "domain": ""}
+        return wss[0] if wss else None
+
+    @classmethod
+    def logo(cls):
+        if cls._logo is None:
+            try:
+                cls._logo = Image.open(SNAP_ICON).convert("RGBA").resize((26, 26))
+            except OSError:
+                cls._logo = False
+        return cls._logo or None
+
+    def render(self, pressed):
+        img, d, fg = tile((74, 21, 75), pressed)   # Slack aubergine
+        ws = self.workspace()
+        logo = self.logo()
+        if logo:
+            img.paste(logo, (6, 6), logo)
+        else:
+            d.text((6, 6), "S", font=font(22), fill=fg)
+        if ws is None:
+            draw_centered_lines(d, ["Slack", "no data"], fg, size=12, top=36)
+            return img
+        counts = slack_state().unreads(ws["id"])
+        unread, mentions = counts if counts else (None, None)
+        # badge top-right
+        text = "?" if unread is None else str(unread)
+        badge = (225, 40, 40) if unread else (90, 90, 100)
+        f = font(16 if len(text) < 3 else 12)
+        w = d.textlength(text, font=f)
+        r = 13
+        cx, cy = KEY_PX - 6 - r, 6 + r
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=badge if not pressed else (0, 0, 0))
+        box = f.getbbox(text)
+        d.text((cx - w / 2, cy - (box[3] - box[1]) / 2 - box[1]), text, font=f, fill=(255, 255, 255))
+        if mentions:
+            d.text((6, 36), f"@{mentions}", font=font(12), fill=(255, 200, 80) if not pressed else fg)
+        lines, size = fit_lines(ws["name"], max_lines=1, sizes=(13, 12, 11, 10, 9))
+        draw_centered_lines(d, lines, fg, size=size, top=KEY_PX - size - 8)
+        return img
+
+    def tap(self):
+        ws = self.workspace()
+        if ws:
+            launch(f"xdg-open 'slack://open?team={ws['id']}'")
+
+
+KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume, "slack": Slack}
 
 
 def load_board(path):

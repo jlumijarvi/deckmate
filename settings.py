@@ -19,6 +19,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, ROWS, KEY_COUNT  # noqa: E402
+from slackstate import SlackState  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(HERE, "keys.json")
@@ -35,6 +36,7 @@ KEY_KINDS = [
     ("volume_down", "Volume down"),
     ("volume_up", "Volume up"),
     ("session", "Claude session slot"),
+    ("slack", "Slack unread badge"),
 ]
 KIND_INDEX = {k: i for i, (k, _) in enumerate(KEY_KINDS)}
 KIND_LABEL = dict(KEY_KINDS)
@@ -76,12 +78,12 @@ def key_kind(cfg, i):
         return ("mute_source" if k.get("target") == "source" else "mute_sink"), k
     if t == "volume":
         return ("volume_up" if int(k.get("step", 5)) > 0 else "volume_down"), k
-    if t == "clock":
-        return "clock", k
+    if t in ("clock", "slack"):
+        return t, k
     return "command", k
 
 
-def set_key(cfg, i, kind, label="", color="#444444", run=""):
+def set_key(cfg, i, kind, label="", color="#444444", run="", team=None):
     keys = cfg.setdefault("keys", {})
     sess = [s for s in session_keys(cfg) if s != i]
     keys.pop(str(i), None)
@@ -91,6 +93,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run=""):
         keys[str(i)] = {"label": label, "color": color, "run": run}
     elif kind == "clock":
         keys[str(i)] = {"type": "clock"}
+    elif kind == "slack":
+        keys[str(i)] = {"type": "slack", **({"team": team} if team else {})}
     elif kind == "mute_source":
         keys[str(i)] = {"type": "mute", "target": "source", "label": label or "Mic"}
     elif kind == "mute_sink":
@@ -111,6 +115,8 @@ def key_summary(cfg, i):
         return k.get("label") or KIND_LABEL[kind]
     if kind == "session":
         return "Claude\nsession"
+    if kind == "slack":
+        return "Slack\n" + (k.get("team") or "")
     if kind == "empty":
         return ""
     return KIND_LABEL[kind]
@@ -228,6 +234,16 @@ class KeyDialog(Adw.Dialog):
         self.run_row.set_text(k.get("run", ""))
         group.add(self.run_row)
 
+        state = SlackState()
+        state.refresh()
+        self.workspaces = state.workspaces()
+        self.team_row = Adw.ComboRow(title="Workspace")
+        names = [f"{w['name']} ({w['domain']})" for w in self.workspaces] or ["none found in Slack's data"]
+        self.team_row.set_model(Gtk.StringList.new(names))
+        ids = [w["id"] for w in self.workspaces]
+        self.team_row.set_selected(ids.index(k["team"]) if k.get("team") in ids else 0)
+        group.add(self.team_row)
+
         view = Adw.ToolbarView()
         header = Adw.HeaderBar()
         save = Gtk.Button(label="Save")
@@ -247,13 +263,15 @@ class KeyDialog(Adw.Dialog):
         self.label_row.set_visible(kind in ("command", "mute_source", "mute_sink"))
         self.color_row.set_visible(kind == "command")
         self.run_row.set_visible(kind == "command")
+        self.team_row.set_visible(kind == "slack")
 
     def on_save(self, *_):
         rgba = self.color_btn.get_rgba()
         color = "#%02x%02x%02x" % (round(rgba.red * 255), round(rgba.green * 255), round(rgba.blue * 255))
+        team = self.workspaces[self.team_row.get_selected()]["id"] if self.workspaces else None
         set_key(self.window.cfg, self.index, self.kind(),
                 label=self.label_row.get_text().replace("\\n", "\n"),
-                color=color, run=self.run_row.get_text())
+                color=color, run=self.run_row.get_text(), team=team)
         self.window.save()
         self.window.refresh_grid()
         self.close()

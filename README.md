@@ -13,6 +13,7 @@ It talks the deck's stock USB HID protocol through `/dev/hidraw*`.
 | `keys.json` | your layout, reloaded automatically when saved; not in git |
 | `keys.example.json` | the starting layout, used until keys.json exists |
 | `sessions.py` | finds live Claude Code sessions and their state |
+| `slackstate.py` | reads Slack's local state file for the unread badge |
 | `settings.py` | settings window (GTK): edit keys.json, start/stop the board, replace the stored image |
 | `install_service.sh` | starts the board at login for the current Linux account (`--remove` undoes it) |
 | `hello_deck.py` | the first test: numbered colour tiles, prints key presses |
@@ -76,9 +77,17 @@ a plain button with a shell command, or a live key:
 | `clock` | time and date | nothing |
 | `mute` | mic or speaker, on or MUTED | toggles it (PipeWire, `wpctl`) |
 | `volume` | speaker volume | changes it by `step` percent |
+| `slack` | workspace name and a badge with the number of conversations that have unread messages, plus `@n` for mentions and DMs | opens that workspace in Slack |
 
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
 sessions fill them.
+
+The `slack` key takes `"team": "<workspace id>"`; without it the first workspace
+in Slack's data is used. The settings window lists the workspaces by name. The
+numbers come from Slack's own state file (`root-state.json` under
+`~/snap/slack/`, `~/.config/Slack/` or the flatpak folder), which holds only
+per-workspace totals, so a per-channel badge is not possible from it. Nothing
+is written to Slack's files and no Slack login is used.
 
 ## Screen saver
 
