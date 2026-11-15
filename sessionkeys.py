@@ -15,7 +15,7 @@ from gitinfo import GitWatcher, dot_kind
 from keys import REFRESH_S, SCROLL_PX_S, Blank, Key
 from pages import NavKey, nav
 from paths import STATE_FILE
-from render import STATE_COLORS, code_mark, dim, draw_centered_lines, fit_lines, font, tile
+from render import MARK_W, STATE_COLORS, code_mark, dim, draw_centered_lines, fit_lines, font, tile
 from sessions import Session, SessionScanner, elapsed_text
 from system import launch
 
@@ -118,10 +118,16 @@ def title_scrolls(name):
     return title_layout(name) is None
 
 
-def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None):
-    """The key image for one session (None -> empty slot)."""
+def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None, filter=None):
+    """The key image for one session (None -> empty slot, which names the filter
+    when one is on so the empty board explains itself)."""
     if s is None:
-        return Image.new("RGB", (KEY_PX, KEY_PX), (12, 12, 14))
+        img = Image.new("RGB", (KEY_PX, KEY_PX), (12, 12, 14))
+        if filter:
+            d = ImageDraw.Draw(img)
+            draw_centered_lines(d, [filter, "only"], dim(STATE_COLORS.get(filter, (120, 120, 120)), 0.6),
+                                size=11, top=24, bold=False)
+        return img
     color = STATE_COLORS.get(s.state, (120, 120, 120))
     factor = 0.12 if hidden else 0.22
     if s.state == "running" and not hidden and not pressed:
@@ -178,7 +184,7 @@ class SessionSlot(Key):
     def render(self, pressed):
         s = self.session
         if s is None:
-            return render_session(None, pressed)
+            return render_session(None, pressed, filter=self.board.view.filter)
         now = time.monotonic()
         return render_session(s, pressed, scroll_t=now - self.board.first_seen.get(s.session_id, now), now=now,
                               git=self.board.git.state(s.cwd))
@@ -259,8 +265,12 @@ class PagerKey(Key):
         img, d, fg = tile((36, 36, 44), pressed)
         symbol = "<" if self.direction == "prev" else ">"
         draw_centered_lines(d, [symbol], fg, size=30, top=10)
-        label = f"{v.page + 1}/{pages}"
-        draw_centered_lines(d, [label], (170, 170, 180) if not pressed else fg, size=11, top=50, bold=False)
+        label_fg = (170, 170, 180) if not pressed else fg
+        if v.filter:   # "waiting" over "1/2", right of the corner mark
+            draw_centered_lines(d, [v.filter, f"{v.page + 1}/{pages}"], label_fg, size=10, top=44, bold=False,
+                                left=MARK_W)
+        else:
+            draw_centered_lines(d, [f"{v.page + 1}/{pages}"], label_fg, size=11, top=50, bold=False)
         code_mark(d, pressed)
         return img
 

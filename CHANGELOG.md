@@ -5,6 +5,9 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- A counter filter now shows on the board: empty slots say "waiting only" (or
+  running, done), the pager label names the state, a counter at zero cannot
+  filter, and the filter clears itself when its state empties.
 - One word for a session taken off the board: "hidden" on the deck, in the
   settings hints and in the log (the hints and log said "dismissed").
 - The prev pager key only turns pages; the stats page is opened by the `stats`

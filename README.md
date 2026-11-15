@@ -101,7 +101,7 @@ a plain button with a shell command, or a live key:
 | `volume` | speaker volume | changes it by `step` percent |
 | `slack` | workspace name and a badge with the number of conversations that have unread messages, plus `@n` for mentions and DMs | opens that workspace in Slack |
 | `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a sub-deck |
-| `counter` (`state`: waiting, running or done) | how many sessions are in that state | filters the board to that state, bright border while on; hold on the done counter hides every done session |
+| `counter` (`state`: waiting, running or done) | how many sessions are in that state | shows only that state: bright border on the counter, empty slots and the pager name the filter, and it clears itself when no session is in that state any more; hold on the done counter hides every done session |
 | `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page; hold shows hidden sessions. next: next page; hold cycles brightness 30 / 60 / 100 |
 | `stats` | percent left in the five-hour plan window | opens the stats page |
 

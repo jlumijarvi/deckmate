@@ -23,6 +23,35 @@ class Holdable:
     holdable = True
 
 
+class FilterTest(unittest.TestCase):
+    def view(self, *states):
+        v = SessionView(5)
+        v.update([S(f"s{i}", f"n{i}", st) for i, st in enumerate(states)])
+        return v
+
+    def test_filter_narrows_and_toggles_off(self):
+        v = self.view("waiting", "done", "done")
+        v.toggle_filter("done")
+        self.assertEqual([s.state for s in v.shown()], ["done", "done"])
+        v.toggle_filter("done")
+        self.assertIsNone(v.filter)
+        self.assertEqual(len(v.shown()), 3)
+
+    def test_zero_counter_does_not_filter(self):
+        v = self.view("waiting", "done")
+        v.toggle_filter("running")
+        self.assertIsNone(v.filter)
+        self.assertEqual(len(v.shown()), 2)
+
+    def test_filter_clears_when_its_state_empties(self):
+        v = self.view("waiting", "done")
+        v.toggle_filter("waiting")
+        self.assertEqual(v.filter, "waiting")
+        v.update([S("s0", "n0", "done"), S("s1", "n1", "done")])
+        self.assertIsNone(v.filter)
+        self.assertEqual(len(v.shown()), 2)
+
+
 class PressTrackerTest(unittest.TestCase):
     def test_plain_key_taps_on_press(self):
         t = PressTracker(0.6)

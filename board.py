@@ -109,6 +109,8 @@ class SessionView:
                 changed = True
         if changed:
             self._persist()
+        if self.filter and self.count(self.filter) == 0:
+            self.filter = None    # nothing left to show: an all-empty board would look broken
         self.page = min(self.page, max(0, self.page_count() - 1))
 
     # -- queries --
@@ -163,6 +165,10 @@ class SessionView:
         return False
 
     def toggle_filter(self, state):
+        """Tap on a counter: show only that state, or show everything again. A
+        counter at zero does nothing, so the board can never filter down to nothing."""
+        if self.filter != state and self.count(state) == 0:
+            return
         self.filter = None if self.filter == state else state
         self.page = 0
 
