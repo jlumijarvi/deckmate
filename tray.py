@@ -186,8 +186,22 @@ class Tray:
                 pass
 
     def open_settings(self):
-        subprocess.Popen([sys.executable, os.path.join(HERE, "settings.py")], cwd=HERE, start_new_session=True,
-                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # In a systemd scope of its own, like the desktop launches apps: a plain child
+        # would inherit the tray's process group, and a tray started from a terminal
+        # inside VS Code's snap sits in VS Code's group, under which GNOME then files
+        # the settings window in the dock (it checks the group before the app id).
+        cmd = [sys.executable, os.path.join(HERE, "settings.py")]
+        if shutil.which("systemd-run"):
+            unit = f"app-stream-deck-settings-{os.getpid()}-{int(time.time())}"
+            p = subprocess.Popen(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit", unit] + cmd,
+                                 cwd=HERE, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                p.wait(timeout=1.5)          # still running: the scope was created and settings is up
+            except subprocess.TimeoutExpired:
+                return
+            if p.returncode == 0:
+                return
+        subprocess.Popen(cmd, cwd=HERE, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     # -- updates --
     def check_updates_later(self):
