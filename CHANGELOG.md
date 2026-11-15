@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.7.2 (2026-11-15)
 
 - Settings: a Version row on the Deck page, and a "Tray icon" row on the
   General page with a Show button that brings the icon back after "Quit tray
