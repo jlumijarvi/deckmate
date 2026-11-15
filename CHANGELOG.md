@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.7.1 (2026-11-15)
 
 - New `brightness` key type: shows the level, tap steps it 30 / 60 / 100 (or
   the key's own `steps`). The next pager's hold no longer cycles brightness.
