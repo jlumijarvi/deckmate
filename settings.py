@@ -196,14 +196,17 @@ def tray_pid():
 
 
 def start_tray():
-    """Start the top-bar icon again after "Quit tray icon". In a systemd scope of
-    its own, so it outlives this window and GNOME does not file it under it."""
+    """Start the top-bar icon again after "Quit tray icon". As a transient user
+    service, not a child of this window: it gets the session environment from the
+    user manager (a --scope would keep this process's, which breaks GTK 3 when the
+    window was started from inside a snap such as VS Code's terminal)."""
     cmd = [sys.executable, os.path.join(HERE, "tray.py")]
     if shutil.which("systemd-run"):
-        unit = f"app-deckmate-tray-{os.getpid()}-{int(time.time())}"
-        subprocess.Popen(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit", unit] + cmd,
-                         cwd=HERE, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return
+        unit = f"deckmate-tray-{os.getpid()}-{int(time.time())}"
+        r = subprocess.run(["systemd-run", "--user", "--quiet", "--collect", "--unit", unit] + cmd,
+                           cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        if r.returncode == 0:
+            return
     subprocess.Popen(cmd, cwd=HERE, start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
