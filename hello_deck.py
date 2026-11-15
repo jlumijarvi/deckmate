@@ -12,7 +12,6 @@ Usage:
     python3 hello_deck.py --brightness 40
 """
 import argparse
-import os
 import signal
 import sys
 import time

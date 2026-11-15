@@ -1,0 +1,111 @@
+import json
+import os
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from deckhid import KEY_COUNT, KEY_PX  # noqa: E402
+from layout import load_board  # noqa: E402
+from pages import nav  # noqa: E402
+from sessionkeys import DismissedPage, PagerKey, SessionSlot  # noqa: E402
+from statskeys import StatsPage  # noqa: E402
+from todokeys import TodoKey, TodoPage  # noqa: E402
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def every_type(todo_file):
+    """A layout that uses every key type the board knows."""
+    return {
+        "brightness": 60,
+        "keys": {
+            "0": {"type": "clock"},
+            "1": {"label": "A very long label that needs wrapping/and-shrinking", "color": "#1f6feb", "run": "true"},
+            "2": {"type": "mute", "target": "source", "label": "Mic"},
+            "3": {"type": "volume", "step": -5},
+            "4": {"type": "slack"},
+            "9": {"type": "todo", "file": todo_file, "soon_days": 2},
+            "10": {"type": "counter", "state": "waiting"},
+            "11": {"type": "counter", "state": "done"},
+            "12": {"type": "stats"},
+            "13": {"type": "pager", "dir": "prev"},
+            "14": {"type": "pager", "dir": "next"},
+            "99": {"type": "command"},
+            "7": {"type": "nonsense"},
+        },
+        "sessions": {"keys": [5, 6, 7, 8]},
+        "screensaver": {"image": "clock", "timeout_min": 5},
+    }
+
+
+class LayoutTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.todo = os.path.join(self.tmp.name, "todo.md")
+        with open(self.todo, "w") as f:
+            f.write("- [ ] First thing  @2026-01-01\n- [ ] Second [n](notes.md)\n- [x] Done\n")
+        self.path = os.path.join(self.tmp.name, "keys.json")
+        with open(self.path, "w") as f:
+            json.dump(every_type(self.todo), f)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def render_all(self, keys):
+        for i, k in enumerate(keys):
+            for pressed in (False, True):
+                img = k.render(pressed)
+                self.assertEqual(img.size, (KEY_PX, KEY_PX), f"key {i} ({type(k).__name__})")
+
+    def test_every_key_type_loads_and_renders(self):
+        keys, brightness, providers, saver = load_board(self.path)
+        self.assertEqual(len(keys), KEY_COUNT)
+        self.assertEqual(brightness, 60)
+        self.assertTrue(saver.enabled and saver.is_tiles)
+        self.assertEqual([type(k).__name__ for k in keys[5:9]], ["SessionSlot"] * 4)
+        self.assertIsInstance(keys[9], TodoKey)
+        self.assertEqual(keys[9].todo.soon_days, 2)
+        keys[9].todo.refresh()
+        self.assertEqual(len(keys[9].todo.items), 2)
+        self.render_all(keys)
+        for k in keys:
+            if k.holdable:
+                self.assertEqual(k.render_held().size, (KEY_PX, KEY_PX))
+
+    def test_pages_render(self):
+        keys, *_ = load_board(self.path)
+        nav.reset(keys)
+        board = next(k for k in keys if isinstance(k, SessionSlot)).board
+        for page in (StatsPage(board), DismissedPage(board), TodoPage(keys[9].todo, keys[9].cfg)):
+            page_keys = page.keys()
+            self.assertEqual(len(page_keys), KEY_COUNT)
+            self.render_all(page_keys)
+
+    def test_example_layout(self):
+        keys, brightness, providers, saver = load_board(os.path.join(HERE, "keys.example.json"))
+        self.assertEqual(len(keys), KEY_COUNT)
+        self.assertIsInstance(keys[13], PagerKey)
+        self.render_all(keys)
+
+    def test_brightness_cycle_writes_to_the_layout_not_the_todo_file(self):
+        keys, *_ = load_board(self.path)
+        with open(self.todo) as f:
+            todo_before = f.read()
+        keys[14].hold()    # next pager: cycle brightness 60 -> 100
+        with open(self.path) as f:
+            self.assertEqual(json.load(f)["brightness"], 100)
+        with open(self.todo) as f:
+            self.assertEqual(f.read(), todo_before)
+
+    def test_prev_pager_opens_stats_from_the_first_page(self):
+        keys, *_ = load_board(self.path)
+        nav.reset(keys)
+        keys[13].tap()
+        self.assertIsInstance(nav.stack[-1], StatsPage)
+        nav.pop()
+        self.assertEqual(nav.stack, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

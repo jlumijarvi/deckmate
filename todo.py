@@ -9,7 +9,6 @@ the link is a Markdown link (its text is ignored) or a bare path ending in .md.
 """
 import os
 import re
-import time
 from dataclasses import dataclass
 from datetime import date, datetime
 

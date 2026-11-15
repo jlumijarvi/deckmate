@@ -58,7 +58,8 @@ def migrate_old_config():
             with open(CONFIG) as f:
                 text = f.read()
             with open(CONFIG, "w") as f:
-                f.write(text.replace(OLD_CONFIG_DIR, CONFIG_DIR).replace("~/.config/stream-deck/", "~/.config/deckmate/"))
+                text = text.replace(OLD_CONFIG_DIR, CONFIG_DIR)
+                f.write(text.replace("~/.config/stream-deck/", "~/.config/deckmate/"))
         print(f"copied the settings from {OLD_CONFIG_DIR} to {CONFIG_DIR}")
     except OSError as e:
         print(f"could not copy the old settings: {e}")

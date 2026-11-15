@@ -12,7 +12,8 @@ class SlackParseTest(unittest.TestCase):
         s.data = {
             "workspaces": {
                 "T2": {"name": "Second", "domain": "second", "order": 1, "icon": {"image_88": "u88"}},
-                "T1": {"name": "First", "domain": "first", "order": 0, "icon": {"image_230": "u230", "image_88": "u88"}},
+                "T1": {"name": "First", "domain": "first", "order": 0,
+                       "icon": {"image_230": "u230", "image_88": "u88"}},
             },
             "webapp": {"teams": {"T1": {"unreads": {"unreads": 3, "unreadHighlights": 1, "showBullet": True}}}},
         }

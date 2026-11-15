@@ -23,7 +23,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 APP_ID = "io.github.jlumijarvi.Deckmate"
 GLib.set_prgname(APP_ID)
 
-from deckhid import Deck, UnsupportedDeck, find_deck, COLS, ROWS, KEY_COUNT  # noqa: E402
+from deckhid import Deck, UnsupportedDeck, find_deck, COLS, KEY_COUNT  # noqa: E402
 from slackstate import SlackState  # noqa: E402
 
 from paths import HERE, CONFIG, EXAMPLE, PID_FILE, config_path, version  # noqa: E402
@@ -184,8 +184,7 @@ SERVICE = "deckmate.service"
 
 
 def service_installed():
-    """True when systemd knows a deckmate.service for this user (from the package
-    or from install_service.sh)."""
+    """True when systemd knows a deckmate.service for this user."""
     try:
         out = subprocess.run(["systemctl", "--user", "show", SERVICE, "-p", "LoadState", "--value"],
                              capture_output=True, text=True, timeout=5).stdout.strip()
@@ -436,7 +435,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         page = Adw.PreferencesPage()
 
         g = Adw.PreferencesGroup(title="Board")
-        self.status_row = Adw.ActionRow(title="deck.py")
+        self.status_row = Adw.ActionRow(title="Status")
         self.start_btn = Gtk.Button(label="Start")
         self.start_btn.set_valign(Gtk.Align.CENTER)
         self.start_btn.connect("clicked", lambda *_: (start_board(), GLib.timeout_add(500, self.refresh_status)))
@@ -568,7 +567,8 @@ class SettingsWindow(Adw.ApplicationWindow):
         for i, (b, lbl) in enumerate(self.grid_buttons):
             kind, _ = key_kind(self.cfg, i)
             text = key_summary(self.cfg, i)
-            lbl.set_markup(f"<small>{i}</small>\n{GLib.markup_escape_text(text)}" if text else f"<small>{i}</small>\n<i>empty</i>")
+            body = GLib.markup_escape_text(text) if text else "<i>empty</i>"
+            lbl.set_markup(f"<small>{i}</small>\n{body}")
             for c in ("session-key", "command-key"):
                 b.remove_css_class(c)
             if kind == "session":

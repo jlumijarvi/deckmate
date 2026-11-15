@@ -68,7 +68,7 @@ def notify(title, body=""):
 
 def adopt_service():
     """Installed from the package: make sure the board service runs for this
-    account, and retire a per-user unit left by install_service.sh."""
+    account, and retire a per-user unit left by an old git-checkout install."""
     old = os.path.expanduser(f"~/.config/systemd/user/{SERVICE}")
     if INSTALLED and os.path.exists(old):
         with open(old) as f:

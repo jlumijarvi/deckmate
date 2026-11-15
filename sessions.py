@@ -20,7 +20,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 SESSIONS_DIR = os.path.expanduser("~/.claude/sessions")
 PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
