@@ -61,12 +61,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4   # first: a later checkout would wipe the downloaded artifact
+
       - uses: actions/download-artifact@v4
         with:
           name: deckmate-deb
           path: dist
-
-      - uses: actions/checkout@v4
 
       - name: Release notes from CHANGELOG.md
         run: |

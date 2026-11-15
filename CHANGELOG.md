@@ -3,6 +3,11 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- CI: the release job checks out the repository before downloading the built
+  package, so the package is attached (0.7.0's was attached by hand).
+
 ## 0.7.0 (2026-11-15)
 
 - The board is split into modules: `render.py` (drawing helpers), `keys.py`
