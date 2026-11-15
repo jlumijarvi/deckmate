@@ -1,15 +1,15 @@
 #!/bin/sh
-# Installs a stream-deck package as root. The tray icon runs this through pkexec;
-# the polkit action io.github.jlumijarvi.StreamDeck.update lets a logged-in user
-# do that without a password. Only a package named stream-deck is accepted.
+# Installs a Deckmate package as root. The tray icon runs this through pkexec;
+# the polkit action io.github.jlumijarvi.Deckmate.update lets a logged-in user
+# do that without a password. Only a package named deckmate is accepted.
 set -e
 DEB="$1"
-[ -n "$DEB" ] && [ -f "$DEB" ] || { echo "usage: install-update <stream-deck.deb>" >&2; exit 2; }
-TMP=$(mktemp -d /tmp/stream-deck-update.XXXXXX)
+[ -n "$DEB" ] && [ -f "$DEB" ] || { echo "usage: install-update <deckmate.deb>" >&2; exit 2; }
+TMP=$(mktemp -d /tmp/deckmate-update.XXXXXX)
 trap 'rm -rf "$TMP"' EXIT
-cp "$DEB" "$TMP/stream-deck.deb"      # a private copy, checked and installed as root
-chmod 644 "$TMP/stream-deck.deb"
-PKG=$(dpkg-deb -f "$TMP/stream-deck.deb" Package)
-[ "$PKG" = "stream-deck" ] || { echo "not a stream-deck package: $PKG" >&2; exit 3; }
+cp "$DEB" "$TMP/deckmate.deb"      # a private copy, checked and installed as root
+chmod 644 "$TMP/deckmate.deb"
+PKG=$(dpkg-deb -f "$TMP/deckmate.deb" Package)
+[ "$PKG" = "deckmate" ] || { echo "not a deckmate package: $PKG" >&2; exit 3; }
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y -q "$TMP/stream-deck.deb"
+apt-get install -y -q "$TMP/deckmate.deb"

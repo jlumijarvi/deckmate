@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Top-bar icon for the Stream Deck board (GTK 3 + AppIndicator).
+"""Top-bar icon for the Deckmate board (GTK 3 + AppIndicator).
 
 Menu: board status, Start / Stop, Settings, Check for updates, Quit.
 The icon switches to the attention variant while a Claude session waits for you.
@@ -24,12 +24,12 @@ from gi.repository import AyatanaAppIndicator3 as AppIndicator  # noqa: E402
 
 from paths import HERE, INSTALLED, PID_FILE, REPO, STATUS_FILE, config_path, ensure_dirs, version  # noqa: E402
 
-SERVICE = "stream-deck.service"
+SERVICE = "deckmate.service"
 UPDATE_CHECK_S = 6 * 3600
-INSTALL_HELPER = "/usr/lib/stream-deck/install-update"   # root helper, passwordless through polkit
-ICON = "stream-deck-symbolic"
-ICON_ATTENTION = "stream-deck-attention-symbolic"
-ICON_OFF = "stream-deck-off-symbolic"
+INSTALL_HELPER = "/usr/lib/deckmate/install-update"   # root helper, passwordless through polkit
+ICON = "deckmate-symbolic"
+ICON_ATTENTION = "deckmate-attention-symbolic"
+ICON_OFF = "deckmate-off-symbolic"
 
 
 def sh(*cmd, timeout=10):
@@ -62,7 +62,7 @@ def read_status():
 
 
 def notify(title, body=""):
-    subprocess.Popen(["notify-send", "-a", "Stream Deck", "-i", "stream-deck", title, body],
+    subprocess.Popen(["notify-send", "-a", "Deckmate", "-i", "deckmate", title, body],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -98,8 +98,8 @@ def version_tuple(v):
 
 class Tray:
     def __init__(self):
-        self.ind = AppIndicator.Indicator.new("stream-deck", ICON, AppIndicator.IndicatorCategory.APPLICATION_STATUS)
-        self.ind.set_title("Stream Deck")
+        self.ind = AppIndicator.Indicator.new("deckmate", ICON, AppIndicator.IndicatorCategory.APPLICATION_STATUS)
+        self.ind.set_title("Deckmate")
         self.ind.set_attention_icon_full(ICON_ATTENTION, "A Claude session is waiting for you")
         self.ind.set_status(AppIndicator.IndicatorStatus.ACTIVE)
         self.update = None  # (tag, deb url, asset name, via_gh) when a newer release is known
@@ -192,7 +192,7 @@ class Tray:
         # the settings window in the dock (it checks the group before the app id).
         cmd = [sys.executable, os.path.join(HERE, "settings.py")]
         if shutil.which("systemd-run"):
-            unit = f"app-stream-deck-settings-{os.getpid()}-{int(time.time())}"
+            unit = f"app-deckmate-settings-{os.getpid()}-{int(time.time())}"
             p = subprocess.Popen(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit", unit] + cmd,
                                  cwd=HERE, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
@@ -222,7 +222,7 @@ class Tray:
         url = f"https://api.github.com/repos/{REPO}/releases/latest"
         try:
             req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
-                                                       "User-Agent": "stream-deck-tray"})
+                                                       "User-Agent": "deckmate-tray"})
             with urllib.request.urlopen(req, timeout=15) as r:
                 return json.load(r), False
         except urllib.error.HTTPError as e:
@@ -247,26 +247,26 @@ class Tray:
     def update_result(self, tag, asset, via_gh, quiet, error):
         if error or not tag:
             if not quiet:
-                notify("Stream Deck: no update information", error or "no releases found")
+                notify("Deckmate: no update information", error or "no releases found")
             return False
         if version_tuple(tag) > version_tuple(version()) and asset:
             self.update = (tag, asset["browser_download_url"], asset["name"], via_gh)
             self.update_item.set_label(f"Update to {tag}…")
             if quiet and auto_update_enabled():
-                notify(f"Stream Deck {tag} is available", "Installing it now.")
+                notify(f"Deckmate {tag} is available", "Installing it now.")
                 self.install_update()
             else:
-                notify(f"Stream Deck {tag} is available", "Use the tray menu to install it.")
+                notify(f"Deckmate {tag} is available", "Use the tray menu to install it.")
         else:
             self.update = None
             self.update_item.set_label("Check for updates")
             if not quiet:
-                notify("Stream Deck is up to date", f"version {version()}")
+                notify("Deckmate is up to date", f"version {version()}")
         return False
 
     def install_update(self):
         tag, url, name, via_gh = self.update
-        cache = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "stream-deck")
+        cache = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "deckmate")
         os.makedirs(cache, exist_ok=True)
         path = os.path.join(cache, name)
 
@@ -280,7 +280,7 @@ class Tray:
                 else:
                     urllib.request.urlretrieve(url, path)
             except Exception as e:
-                GLib.idle_add(notify, "Stream Deck update failed", f"download: {e}")
+                GLib.idle_add(notify, "Deckmate update failed", f"download: {e}")
                 return
             # the packaged helper needs no password (polkit action); a git checkout
             # falls back to apt-get, and pkexec asks for the password in a dialog
@@ -290,13 +290,13 @@ class Tray:
                 cmd = ["pkexec", "apt-get", "install", "-y", path]
             r = subprocess.run(cmd, capture_output=True, text=True)
             if r.returncode != 0:
-                GLib.idle_add(notify, "Stream Deck update failed", (r.stderr or r.stdout).strip()[-300:])
+                GLib.idle_add(notify, "Deckmate update failed", (r.stderr or r.stdout).strip()[-300:])
                 return
             GLib.idle_add(self.after_update, tag)
         threading.Thread(target=work, daemon=True).start()
 
     def after_update(self, tag):
-        notify(f"Stream Deck updated to {tag}", "Restarting the board.")
+        notify(f"Deckmate updated to {tag}", "Restarting the board.")
         if service_loaded():
             sh("systemctl", "--user", "restart", SERVICE)
         os.execv(sys.executable, [sys.executable, os.path.abspath(__file__)])

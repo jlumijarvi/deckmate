@@ -39,13 +39,13 @@ jobs:
 
       - name: Install the .deb on the runner
         run: |
-          sudo apt-get install -y -q ./dist/stream-deck_*_all.deb
-          stream-deck --version
-          dpkg -L stream-deck
+          sudo apt-get install -y -q ./dist/deckmate_*_all.deb
+          deckmate --version
+          dpkg -L deckmate
 
       - uses: actions/upload-artifact@v4
         with:
-          name: stream-deck-deb
+          name: deckmate-deb
           path: dist/*.deb
           if-no-files-found: error
 
@@ -59,7 +59,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: stream-deck-deb
+          name: deckmate-deb
           path: dist
 
       - name: Create the release with the .deb attached
@@ -69,5 +69,5 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-                 --title "$TAG" --notes "stream-deck ${TAG#v}"
+                 --title "$TAG" --notes "deckmate ${TAG#v}"
           gh release upload "$TAG" dist/*.deb --repo "$GITHUB_REPOSITORY" --clobber

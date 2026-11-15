@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Deckmate
+Comment=Settings for the Deckmate board (Elgato Stream Deck)
+Exec=deckmate settings
+Icon=deckmate
+Terminal=false
+Categories=Utility;Settings;
+Keywords=deck;elgato;stream deck;claude;

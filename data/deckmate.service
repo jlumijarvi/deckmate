@@ -1,11 +1,11 @@
 [Unit]
-Description=Stream Deck board (deck.py)
+Description=Deckmate board for the Elgato Stream Deck
 PartOf=graphical-session.target
 After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 -u /usr/lib/stream-deck/deck.py
+ExecStart=/usr/bin/python3 -u /usr/lib/deckmate/deck.py
 Restart=on-failure
 RestartSec=3
 

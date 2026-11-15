@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Step 1: say hello to an Elgato Stream Deck (Original V2 / MK.2) on Linux.
+"""Hardware check: say hello to an Elgato Stream Deck (Original V2 / MK.2) on Linux.
 
 Talks the stock HID protocol straight through /dev/hidrawN, no libraries
 besides Pillow. Paints a numbered colour tile on every key, reports key

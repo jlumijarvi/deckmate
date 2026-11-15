@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Settings window for the Stream Deck board.
+"""Settings window for the Deckmate board.
 
 Edits keys.json (the running deck.py picks changes up within a second), starts
 and stops the board, and can replace the picture stored inside the deck.
@@ -20,7 +20,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 # must equal the desktop file's name so GNOME groups the window under its own
 # dock icon instead of guessing (it ended up in the VS Code group)
-APP_ID = "io.github.jlumijarvi.StreamDeck"
+APP_ID = "io.github.jlumijarvi.Deckmate"
 GLib.set_prgname(APP_ID)
 
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, ROWS, KEY_COUNT  # noqa: E402
@@ -180,11 +180,11 @@ def board_pid():
     return pid if os.path.exists(f"/proc/{pid}") else None
 
 
-SERVICE = "stream-deck.service"
+SERVICE = "deckmate.service"
 
 
 def service_installed():
-    """True when systemd knows a stream-deck.service for this user (from the package
+    """True when systemd knows a deckmate.service for this user (from the package
     or from install_service.sh)."""
     try:
         out = subprocess.run(["systemctl", "--user", "show", SERVICE, "-p", "LoadState", "--value"],
@@ -318,7 +318,7 @@ class KeyDialog(Adw.Dialog):
 
         # to-do list rows
         self.todo_file = Adw.ActionRow(title="List file")
-        self.todo_file.set_subtitle(k.get("file") or "~/.config/stream-deck/todo.md")
+        self.todo_file.set_subtitle(k.get("file") or "~/.config/deckmate/todo.md")
         btn = Gtk.Button(label="Choose…")
         btn.set_valign(Gtk.Align.CENTER)
         btn.connect("clicked", lambda *_: choose_file(self.window, self.on_todo_file, "Choose the to-do list file"))
@@ -388,7 +388,7 @@ class KeyDialog(Adw.Dialog):
 
 class SettingsWindow(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title=f"Stream Deck settings  ·  v{version()}")
+        super().__init__(application=app, title=f"Deckmate settings  ·  v{version()}")
         self.set_default_size(620, 680)
         self.cfg = load_config()
         self._save_pending = None

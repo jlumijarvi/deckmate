@@ -1,34 +1,38 @@
-# Stream Deck board for Linux
+# Deckmate
 
 A small Python program that drives an Elgato Stream Deck (Original V2 or MK.2,
 15 keys) on Ubuntu, with no Elgato software and no libraries beyond Pillow.
-It talks the deck's stock USB HID protocol through `/dev/hidraw*`.
+It talks the deck's stock USB HID protocol through `/dev/hidraw*`. Besides
+plain buttons it shows one key per running Claude Code session.
+
+Until 0.6 the project was called stream-deck; the package replaces the old
+one and copies your settings over on first start.
 
 ## Install (Ubuntu)
 
 Download the `.deb` from the latest
-[release](https://github.com/jlumijarvi/stream-deck/releases) and install it:
+[release](https://github.com/jlumijarvi/deckmate/releases) and install it:
 
 ```
-sudo apt install ./stream-deck_<version>_all.deb
+sudo apt install ./deckmate_<version>_all.deb
 ```
 
 Then log out and in. Every account on the machine gets the board at login, a
 top-bar icon with a menu (board status, start/stop, settings, updates), and a
-"Stream Deck" entry in the app grid that opens the settings. Each account has
-its own layout in `~/.config/stream-deck/keys.json`.
+"Deckmate" entry in the app grid that opens the settings. Each account has
+its own layout in `~/.config/deckmate/keys.json`.
 
 The top-bar icon needs GNOME's AppIndicator extension, which Ubuntu enables by
 default. The tray icon checks GitHub every six hours for a newer release and
 installs it on its own (switch "Install updates automatically" in the settings;
 off means it only offers the update in its menu). The install runs the root
-helper `/usr/lib/stream-deck/install-update` through pkexec; the polkit action
+helper `/usr/lib/deckmate/install-update` through pkexec; the polkit action
 shipped with the package lets a logged-in user do that without a password, and
-the helper accepts nothing but a package named stream-deck. While the
+the helper accepts nothing but a package named deckmate. While the
 repository is private, the check goes through the `gh` tool, so run
 `gh auth login` once in each account.
 
-Command line: `stream-deck settings | board | sessions | tray | --version`.
+Command line: `deckmate settings | board | sessions | tray | --version`.
 
 ## Releasing a new version
 
@@ -45,7 +49,7 @@ The script waits for that run and prints the release link.
 | --- | --- |
 | `deckhid.py` | the driver: find the deck, set brightness, paint keys, read presses |
 | `deck.py` | the board: reads `keys.json`, paints keys, runs actions |
-| `~/.config/stream-deck/keys.json` | your layout, reloaded automatically when saved |
+| `~/.config/deckmate/keys.json` | your layout, reloaded automatically when saved |
 | `keys.example.json` | the starting layout, used until keys.json exists |
 | `sessions.py` | finds live Claude Code sessions and their state |
 | `slackstate.py` | reads Slack's local state file for the unread badge |
@@ -78,8 +82,8 @@ The package installs a systemd user service, enabled for all accounts, that
 starts the board with the graphical session and stops at logout:
 
 ```
-systemctl --user status stream-deck
-journalctl --user -u stream-deck -f
+systemctl --user status deckmate
+journalctl --user -u deckmate -f
 ```
 
 Running from a git checkout instead: `./install_service.sh` installs the same
@@ -136,7 +140,7 @@ is written to Slack's files and no Slack login is used.
 ## To-do list
 
 The `todo` key reads a Markdown task list, by default
-`~/.config/stream-deck/todo.md` (created with an example on first use). One
+`~/.config/deckmate/todo.md` (created with an example on first use). One
 item per line:
 
 ```markdown
@@ -184,8 +188,8 @@ bottom-left corner, so they stand out from ordinary buttons.
 
 ## Log
 
-The board logs to the journal (`journalctl --user -u stream-deck`) and to
-`~/.local/state/stream-deck/deck.log`, rotated at 1 MB, three files kept.
+The board logs to the journal (`journalctl --user -u deckmate`) and to
+`~/.local/state/deckmate/deck.log`, rotated at 1 MB, three files kept.
 
 ## Tests
 

@@ -17,6 +17,6 @@ git tag -a "v$NEW" -m "Release $NEW"
 git push -q && git push -q --tags
 echo "pushed v$NEW, waiting for CI to publish the release"
 sleep 10
-RUN=$(gh run list --repo jlumijarvi/stream-deck --branch "v$NEW" --limit 1 --json databaseId -q '.[0].databaseId')
-[ -n "$RUN" ] && gh run watch "$RUN" --repo jlumijarvi/stream-deck --exit-status
-echo "released v$NEW: https://github.com/jlumijarvi/stream-deck/releases/tag/v$NEW"
+RUN=$(gh run list --repo jlumijarvi/deckmate --branch "v$NEW" --limit 1 --json databaseId -q '.[0].databaseId')
+[ -n "$RUN" ] && gh run watch "$RUN" --repo jlumijarvi/deckmate --exit-status
+echo "released v$NEW: https://github.com/jlumijarvi/deckmate/releases/tag/v$NEW"

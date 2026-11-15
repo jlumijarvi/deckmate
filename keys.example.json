@@ -5,9 +5,9 @@
       "type": "clock"
     },
     "1": {
-      "label": "Code\nstream-deck",
+      "label": "VS Code",
       "color": "#1f6feb",
-      "run": "code ~/Code/stream-deck"
+      "run": "code"
     },
     "2": {
       "label": "Terminal",

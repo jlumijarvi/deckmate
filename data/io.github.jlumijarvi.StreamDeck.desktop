@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Stream Deck
-Comment=Settings for the Stream Deck board
-Exec=stream-deck settings
-Icon=stream-deck
-Terminal=false
-Categories=Utility;Settings;
-Keywords=deck;elgato;claude;

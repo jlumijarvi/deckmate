@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Step 2: a Stream Deck board of plain buttons, configured in keys.json.
+"""Deckmate: the board. Keys configured in keys.json, painted on an Elgato Stream Deck.
 
 Key types (see keys.json):
   command  (default)  label, color, run       tap runs the shell command
@@ -11,7 +11,7 @@ Key types (see keys.json):
   todo                open items in a to-do list (a Markdown task list, see todo.py),
                       coloured by urgency; tap opens the list as a sub-deck, one key per
                       item, tap an item to open its linked file, hold it to mark it done.
-                      Per key: "file" (default ~/.config/stream-deck/todo.md), "label",
+                      Per key: "file" (default ~/.config/deckmate/todo.md), "label",
                       "open_with" (default "code"), "soon_days" (0), "hold_done" (true)
 
 A "screensaver" entry: {"image": "clock" | "/path/to/picture", "timeout_min": 5,
@@ -336,12 +336,12 @@ def demo_sessions():
         pid=0, session_id="demo-" + name, name=name, cwd="", state=state, waiting_kind=kind,
         since=now - ago, ctx_used=ctx, ctx_window=1_000_000, transcript="")
     return sorted([
-        mk("Korg CX-3 web MIDI app", ("running", "done", "waiting")[phase], ("", "", "!")[phase], 95, 240_000),
-        mk("Yamaha CK remaining work", "waiting", "?", 12, 610_000),
-        mk("Stream Deck tweaking project overview", "running", "", 240, 120_000),
-        mk("Encrypted SSD migration to Ubuntu", "done", "", 4000, 900_000),
-        mk("vire", "stopped", "", 90000, 50_000),
-        mk("gearbasement", "failed", "", 700, 300_000),
+        mk("Web MIDI synth editor", ("running", "done", "waiting")[phase], ("", "", "!")[phase], 95, 240_000),
+        mk("Invoice service remaining work", "waiting", "?", 12, 610_000),
+        mk("Deckmate project overview", "running", "", 240, 120_000),
+        mk("Laptop migration to Ubuntu", "done", "", 4000, 900_000),
+        mk("blog", "stopped", "", 90000, 50_000),
+        mk("garage-sale", "failed", "", 700, 300_000),
     ], key=lambda s: s.sort_key)
 
 

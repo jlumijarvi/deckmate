@@ -25,7 +25,7 @@ Markdown link opens that file when the key is tapped.
 
 - [ ] Try the to-do key on the deck  @{today}
 - [ ] Sort out the backup disk  [plan](~/Documents/backup-plan.md)
-- [x] Install the Stream Deck board
+- [x] Install Deckmate
 """
 
 
@@ -179,7 +179,7 @@ def due_text(d, today=None):
 
 if __name__ == "__main__":
     import sys
-    t = TodoList(sys.argv[1] if len(sys.argv) > 1 else "~/.config/stream-deck/todo.md")
+    t = TodoList(sys.argv[1] if len(sys.argv) > 1 else "~/.config/deckmate/todo.md")
     t.refresh()
     print(f"{t.path}: {len(t.items)} open, urgency {t.urgency()}")
     for i in t.items:
