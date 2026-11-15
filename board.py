@@ -12,8 +12,8 @@ FINISHED = ("done", "stopped", "failed")
 class PressTracker:
     """Turns raw key-down / key-up events into taps and holds.
 
-    Keys that are not holdable fire 'tap' on press. Holdable keys fire 'hold'
-    once the key has been down for hold_s, or 'tap' on release before that.
+    Keys that are not holdable fire 'press' as soon as they go down. Holdable keys
+    fire 'hold' once the key has been down for hold_s, or 'press' on release before that.
     feed() returns a list of (action, key_index, key_object) tuples.
     """
 
@@ -29,7 +29,7 @@ class PressTracker:
                 self.down[index] = (key, now)
                 self.fired.discard(index)
             else:
-                events.append(("tap", index, key))
+                events.append(("press", index, key))
         else:
             entry = self.down.pop(index, None)
             if entry is not None:
@@ -38,7 +38,7 @@ class PressTracker:
                     self.fired.discard(index)
                     events.append(("release-after-hold", index, k))
                 else:
-                    events.append(("tap", index, k))
+                    events.append(("press", index, k))
         return events
 
     def tick(self, now):
@@ -165,7 +165,7 @@ class SessionView:
         return False
 
     def toggle_filter(self, state):
-        """Tap on a counter: show only that state, or show everything again. A
+        """Press on a counter: show only that state, or show everything again. A
         counter at zero does nothing, so the board can never filter down to nothing."""
         if self.filter != state and self.count(state) == 0:
             return

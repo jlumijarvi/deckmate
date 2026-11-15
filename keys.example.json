@@ -5,22 +5,22 @@
       "type": "clock"
     },
     "1": {
-      "label": "VS Code",
+      "title": "VS Code",
       "color": "#1f6feb",
       "run": "code"
     },
     "2": {
-      "label": "Terminal",
+      "title": "Terminal",
       "color": "#2d333b",
       "run": "ptyxis --new-window"
     },
     "3": {
-      "label": "Files",
+      "title": "Files",
       "color": "#b08968",
       "run": "xdg-open ~"
     },
     "4": {
-      "label": "Browser",
+      "title": "Browser",
       "color": "#e36209",
       "run": "xdg-open https://claude.ai"
     },

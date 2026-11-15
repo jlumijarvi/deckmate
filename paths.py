@@ -4,6 +4,7 @@
   config          ~/.config/deckmate/keys.json   (per Linux account)
   runtime         $XDG_RUNTIME_DIR/deckmate/     (pid and status files)
 """
+import json
 import os
 import shutil
 
@@ -78,3 +79,37 @@ def config_path():
         except OSError:
             return src
     return CONFIG
+
+
+def migrate_layout(cfg):
+    """Bring old field names in a layout up to date. Returns True when something changed.
+    0.8: the text on a key is its "title" (Elgato's word); it used to be "label"."""
+    changed = False
+    entries = list(cfg.get("keys", {}).values()) + [cfg.get("todo", {})]
+    for k in entries:
+        if isinstance(k, dict) and "label" in k:
+            v = k.pop("label")
+            k.setdefault("title", v)
+            changed = True
+    return changed
+
+
+def write_layout(path, cfg):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cfg, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, path)
+
+
+def read_layout(path):
+    """keys.json as a dict. Old field names are migrated and written back once."""
+    with open(path) as f:
+        cfg = json.load(f)
+    if migrate_layout(cfg):
+        try:
+            write_layout(path, cfg)
+            print(f"updated {path} to the current field names")
+        except OSError:
+            pass
+    return cfg

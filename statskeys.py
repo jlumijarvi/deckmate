@@ -66,14 +66,14 @@ class StatsKey(Key):
         img, d, fg = tile(dim(color, 0.3), pressed)
         if not pressed:
             d.rectangle([0, 0, KEY_PX, 4], fill=color)
-        draw_centered_lines(d, [self.cfg.get("label") or "stats"], fg, size=12, top=9)
+        draw_centered_lines(d, [self.cfg.get("title") or "stats"], fg, size=12, top=9)
         draw_centered_lines(d, ["—" if left is None else f"{left}%"], fg, size=26, top=24)
         draw_centered_lines(d, ["5h left"], (200, 200, 210) if not pressed else fg, size=10, top=56, bold=False,
                             left=MARK_W)
         code_mark(d, pressed)
         return img
 
-    def tap(self):
+    def press(self):
         nav.push(StatsPage(self.board))
 
 

@@ -56,7 +56,7 @@ class PressTrackerTest(unittest.TestCase):
     def test_plain_key_taps_on_press(self):
         t = PressTracker(0.6)
         k = Plain()
-        self.assertEqual(t.feed(3, k, True, 10.0), [("tap", 3, k)])
+        self.assertEqual(t.feed(3, k, True, 10.0), [("press", 3, k)])
         self.assertEqual(t.feed(3, k, False, 10.1), [])
 
     def test_holdable_short_press_taps_on_release(self):
@@ -64,7 +64,7 @@ class PressTrackerTest(unittest.TestCase):
         k = Holdable()
         self.assertEqual(t.feed(1, k, True, 10.0), [])
         self.assertEqual(t.tick(10.3), [])
-        self.assertEqual(t.feed(1, k, False, 10.4), [("tap", 1, k)])
+        self.assertEqual(t.feed(1, k, False, 10.4), [("press", 1, k)])
 
     def test_holdable_long_press_holds_once(self):
         t = PressTracker(0.6)
@@ -81,7 +81,7 @@ class PressTrackerTest(unittest.TestCase):
         t.feed(1, a, True, 0.0)
         t.feed(2, b, True, 0.5)
         self.assertEqual(t.tick(0.7), [("hold", 1, a)])
-        self.assertEqual(t.feed(2, b, False, 0.8), [("tap", 2, b)])
+        self.assertEqual(t.feed(2, b, False, 0.8), [("press", 2, b)])
 
 
 def sessions(*specs):

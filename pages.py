@@ -1,4 +1,4 @@
-"""Sub-decks: a stack of pages opened on top of the main board, and the key
+"""Folders: a stack of pages opened on top of the main board, and the key
 that goes back or turns a page."""
 from keys import Key
 from render import draw_centered_lines, tile
@@ -51,5 +51,5 @@ class NavKey(Key):
         draw_centered_lines(d, [self.label], (170, 170, 180) if not pressed else fg, size=11, top=50, bold=False)
         return img
 
-    def tap(self):
+    def press(self):
         self.action()

@@ -1,12 +1,11 @@
 """Build the board from keys.json: one Key object per position, the shared
 data providers, brightness and the screen saver."""
-import json
 import logging
 import os
 
 from deckhid import KEY_COUNT
 from keys import Blank, Brightness, Clock, Command, Mute, Volume
-from paths import CONFIG_DIR
+from paths import CONFIG_DIR, read_layout
 from saver import ScreenSaver
 from sessionkeys import CounterKey, PagerKey, SessionBoard, SessionSlot
 from slackkey import Slack
@@ -21,8 +20,7 @@ KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume,
 
 
 def load_board(path):
-    with open(path) as f:
-        cfg = json.load(f)
+    cfg = read_layout(path)
     keys = [Blank({}) for _ in range(KEY_COUNT)]
     for idx, kcfg in cfg.get("keys", {}).items():
         i = int(idx)

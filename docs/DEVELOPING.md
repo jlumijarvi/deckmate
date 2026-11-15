@@ -53,7 +53,7 @@ logs to stdout and to `~/.local/state/deckmate/deck.log`.
 The GTK 3 tray and the GTK 4 settings window cannot share a process, which is
 why they are separate programs and why CI imports them separately.
 
-Keys are plain classes with `render(pressed)`, `tap()` and, when `holdable`,
+Keys are plain classes with `render(pressed)`, `press()` and, when `holdable`,
 `hold()` and `render_held()`; `dynamic` keys are re-rendered every refresh
 tick. A page (sub-deck) is anything with a `keys()` method returning 15 keys;
 `pages.nav` is the one navigator, keys push pages onto it and set `nav.dirty`
@@ -65,6 +65,17 @@ anything about one key lives in that key's dialog.
 
 Wording rule: the code and state.json say "dismissed"; everything the user
 sees (deck, settings hints, log, README) says "hidden".
+
+Terminology: use Elgato's words where they have one, so a Stream Deck user
+finds what they expect. Key (a button), title (the text on a key), press and
+hold, page with Previous Page / Next Page keys, folder (a key that opens
+another set of keys, back key top left), profile (a layout for one device,
+reserved for when layouts become switchable), screen saver, sleep after,
+brightness, device. Deckmate's own words, with no Elgato equivalent: board
+(the running program and its main keys), session slot, counter, pager (our
+name for a Previous / Next Page pair), hidden session, stats. In keys.json the
+text on a key was `label` until 0.7; `paths.read_layout` migrates it to
+`title` on first read.
 
 ## Tests and lint
 

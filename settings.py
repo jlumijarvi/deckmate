@@ -6,7 +6,6 @@ and stops the board, and can replace the picture stored inside the deck.
 
     python3 settings.py
 """
-import json
 import os
 import shutil
 import signal
@@ -27,7 +26,8 @@ GLib.set_prgname(APP_ID)
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, KEY_COUNT  # noqa: E402
 from slackstate import SlackState  # noqa: E402
 
-from paths import HERE, CONFIG, EXAMPLE, PID_FILE, TRAY_PID_FILE, config_path, version  # noqa: E402
+from paths import (HERE, CONFIG, EXAMPLE, PID_FILE, TRAY_PID_FILE,  # noqa: E402
+                   config_path, read_layout, version, write_layout)
 
 DECK_PY = os.path.join(HERE, "deck.py")
 
@@ -54,18 +54,18 @@ KIND_INDEX = {k: i for i, (k, _) in enumerate(KEY_KINDS)}
 KIND_LABEL = dict(KEY_KINDS)
 # shown under the type row; the short labels above must fit the dropdown
 KIND_HINT = {
-    "command": "Runs a shell command when tapped",
+    "command": "Runs a shell command when pressed",
     "mute_source": "Toggles the microphone; the key shows its state",
     "mute_sink": "Toggles the speakers; the key shows its state",
     "slack": "Unread count and @mentions of one Slack workspace",
-    "todo": "Open items in a Markdown task list; tap opens them as a sub-deck",
-    "session": "One running Claude Code session. Tap opens its folder in VS Code, hold hides it",
-    "counter_waiting": "Sessions asking you something. Tap filters the slots to them",
-    "counter_running": "Sessions still working. Tap filters the slots to them",
-    "counter_done": "Finished sessions. Tap filters, hold hides them all",
+    "todo": "Open items in a Markdown task list; press opens them as a folder",
+    "session": "One running Claude Code session. Press opens its folder in VS Code, hold hides it",
+    "counter_waiting": "Sessions asking you something. Press filters the slots to them",
+    "counter_running": "Sessions still working. Press filters the slots to them",
+    "counter_done": "Finished sessions. Press filters, hold hides them all",
     "pager_prev": "Previous page of sessions. Hold: hidden sessions",
     "pager_next": "Next page of sessions",
-    "brightness": "Shows the deck's brightness; tap steps it 30 / 60 / 100",
+    "brightness": "Shows the deck's brightness; press steps it 30 / 60 / 100",
     "stats": "Opens the stats page: plan quota, tokens today, cache reads, fullest context",
 }
 
@@ -75,19 +75,14 @@ KIND_HINT = {
 def load_config():
     for path in (config_path(), EXAMPLE):
         try:
-            with open(path) as f:
-                return json.load(f)
+            return read_layout(path)
         except (OSError, ValueError):
             continue
     return {}
 
 
 def save_config(cfg):
-    tmp = CONFIG + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(cfg, f, indent=2)
-        f.write("\n")
-    os.replace(tmp, CONFIG)
+    write_layout(CONFIG, cfg)
 
 
 def session_keys(cfg):
@@ -122,7 +117,7 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
     if kind == "session":
         sess.append(i)
     elif kind == "command":
-        keys[str(i)] = {"label": label, "color": color, "run": run}
+        keys[str(i)] = {"title": label, "color": color, "run": run}
     elif kind == "clock":
         keys[str(i)] = {"type": "clock"}
     elif kind == "slack":
@@ -138,9 +133,9 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
     elif kind.startswith("pager_"):
         keys[str(i)] = {"type": "pager", "dir": kind.split("_", 1)[1]}
     elif kind == "mute_source":
-        keys[str(i)] = {"type": "mute", "target": "source", "label": label or "Mic"}
+        keys[str(i)] = {"type": "mute", "target": "source", "title": label or "Mic"}
     elif kind == "mute_sink":
-        keys[str(i)] = {"type": "mute", "target": "sink", "label": label or "Speaker"}
+        keys[str(i)] = {"type": "mute", "target": "sink", "title": label or "Speaker"}
     elif kind == "volume_down":
         keys[str(i)] = {"type": "volume", "step": -5}
     elif kind == "volume_up":
@@ -152,9 +147,9 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
 def key_summary(cfg, i):
     kind, k = key_kind(cfg, i)
     if kind == "command":
-        return k.get("label", "").replace("\n", " ") or "(no label)"
+        return k.get("title", "").replace("\n", " ") or "(no title)"
     if kind in ("mute_source", "mute_sink"):
-        return k.get("label") or KIND_LABEL[kind]
+        return k.get("title") or KIND_LABEL[kind]
     if kind == "session":
         return "Claude\nsession"
     if kind == "slack":
@@ -319,8 +314,8 @@ class KeyDialog(Adw.Dialog):
                               margin_start=12, margin_end=12, margin_top=6, margin_bottom=6)
         group.add(self.hint)
 
-        self.label_row = Adw.EntryRow(title="Label (use \\n for a line break)")
-        self.label_row.set_text(k.get("label", "").replace("\n", "\\n"))
+        self.label_row = Adw.EntryRow(title="Title (use \\n for a line break)")
+        self.label_row.set_text(k.get("title", "").replace("\n", "\\n"))
         group.add(self.label_row)
 
         self.color_row = Adw.ActionRow(title="Colour")
@@ -405,7 +400,7 @@ class KeyDialog(Adw.Dialog):
             "open_with": self.todo_open.get_text().strip() or "code",
             "soon_days": int(self.todo_soon.get_value()),
             "hold_done": bool(self.todo_hold.get_active()),
-            **({"label": label} if label.strip() else {}),
+            **({"title": label} if label.strip() else {}),
         }
         set_key(self.window.cfg, self.index, self.kind(),
                 label=label, color=color, run=self.run_row.get_text(), team=team, todo=todo)
@@ -427,7 +422,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         stack = self.stack = Adw.ViewStack()
         stack.add_titled_with_icon(self.build_general(), "general", "General", "preferences-system-symbolic")
         stack.add_titled_with_icon(self.build_keys(), "keys", "Keys", "input-keyboard-symbolic")
-        stack.add_titled_with_icon(self.build_deck(), "deck", "Deck", "drive-removable-media-symbolic")
+        stack.add_titled_with_icon(self.build_deck(), "device", "Device", "drive-removable-media-symbolic")
 
         switcher = Adw.ViewSwitcher()
         switcher.set_stack(stack)
@@ -510,14 +505,14 @@ class SettingsWindow(Adw.ApplicationWindow):
         g.add(self.saver_pic)
 
         self.saver_timeout = Adw.SpinRow.new_with_range(0, 240, 1)
-        self.saver_timeout.set_title("Idle minutes before the screen saver")
+        self.saver_timeout.set_title("Screen saver after (minutes)")
         self.saver_timeout.set_subtitle("0 turns the screen saver off")
         self.saver_timeout.set_value(float(saver.get("timeout_min", 5) or 0))
         self.saver_timeout.connect("notify::value", lambda *_: self.on_saver_number("timeout_min", self.saver_timeout))
         g.add(self.saver_timeout)
 
         self.saver_sleep = Adw.SpinRow.new_with_range(0, 1440, 5)
-        self.saver_sleep.set_title("Idle minutes before the backlight goes off")
+        self.saver_sleep.set_title("Sleep after (minutes)")
         self.saver_sleep.set_subtitle("The deck's own timer. 0 means never. A key press wakes it.")
         self.saver_sleep.set_value(float(saver.get("sleep_min", 0) or 0))
         self.saver_sleep.connect("notify::value", lambda *_: self.on_saver_number("sleep_min", self.saver_sleep))

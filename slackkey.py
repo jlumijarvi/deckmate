@@ -74,7 +74,7 @@ class Slack(Key):
         draw_centered_lines(d, lines, fg, size=size, top=KEY_PX - size - 16)
         return img
 
-    def tap(self):
+    def press(self):
         ws = self.workspace()
         if ws:
             launch(f"xdg-open 'slack://open?team={ws['id']}'")

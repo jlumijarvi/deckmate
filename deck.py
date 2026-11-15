@@ -2,17 +2,17 @@
 """Deckmate: the board. Keys configured in keys.json, painted on an Elgato Stream Deck.
 
 Key types (see keys.json):
-  command  (default)  label, color, run       tap runs the shell command
+  command  (default)  title, color, run       press runs the shell command
   clock               shows time and date, updates every second
-  mute                target "source" (mic) or "sink" (speaker); shows state, tap toggles
-  volume              step (+/- percent); shows the speaker volume, tap changes it
-  brightness          shows the deck's brightness; tap steps it 30 / 60 / 100 ("steps")
+  mute                target "source" (mic) or "sink" (speaker); shows state, press toggles
+  volume              step (+/- percent); shows the speaker volume, press changes it
+  brightness          shows the deck's brightness; press steps it 30 / 60 / 100 ("steps")
   slack               unread badge for one workspace ("team": id, default: the first
-                      workspace found); tap opens that workspace in Slack
+                      workspace found); press opens that workspace in Slack
   todo                open items in a to-do list (a Markdown task list, see todo.py),
-                      coloured by urgency; tap opens the list as a sub-deck, one key per
-                      item, tap an item to open its linked file, hold it to mark it done.
-                      Per key: "file" (default ~/.config/deckmate/todo.md), "label",
+                      coloured by urgency; press opens the list as a folder, one key per
+                      item, press an item to open its linked file, hold it to mark it done.
+                      Per key: "file" (default ~/.config/deckmate/todo.md), "title",
                       "open_with" (default "code"), "soon_days" (0), "hold_done" (true)
 
 A "screensaver" entry: {"image": "clock" | "/path/to/picture", "timeout_min": 5,
@@ -22,7 +22,7 @@ sleep_min is the deck's own backlight-off timer (0 = never). On exit the saver i
 painted one last time, so it stays on the deck's screen instead of the stored image.
 
 A "sessions" entry claims a list of keys for live Claude Code sessions, one per
-key, sorted waiting / running / done / stopped / failed. Tap opens the session's
+key, sorted waiting / running / done / stopped / failed. Press opens the session's
 folder in VS Code, which raises the window that already has it open.
 
 Usage:
@@ -340,10 +340,10 @@ def main():
                             continue
                         pressed[i] = is_now
                         for action, _, k in presses.feed(i, nav.keys()[i], is_now, time.monotonic()):
-                            if action == "tap":
-                                log.info(f"key {i} tap")
+                            if action == "press":
+                                log.info(f"key {i} press")
                                 try:
-                                    k.tap()
+                                    k.press()
                                 except Exception as e:  # a bad command must not kill the board
                                     log.info(f"key {i} action failed: {e}")
                             elif action == "release-after-hold":

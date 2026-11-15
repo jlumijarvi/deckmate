@@ -1,4 +1,4 @@
-"""To-do keys: the badge on the main board, the list as a sub-deck, one key per item."""
+"""To-do keys: the badge on the main board, the list as a folder, one key per item."""
 import logging
 import os
 import shlex
@@ -47,7 +47,7 @@ class TodoKey(Key):
         img, d, fg = tile(dim(color, 0.35), pressed)
         if not pressed:
             d.rectangle([0, 0, KEY_PX, 4], fill=color)
-        draw_centered_lines(d, [self.cfg.get("label") or "To do"], fg, size=12, top=9)
+        draw_centered_lines(d, [self.cfg.get("title") or "To do"], fg, size=12, top=9)
         if not t.exists:
             draw_centered_lines(d, ["no file"], fg, size=11, top=40, bold=False)
             return img
@@ -64,7 +64,7 @@ class TodoKey(Key):
         draw_centered_lines(d, [foot], (230, 230, 235) if not pressed else fg, size=10, top=56, bold=False)
         return img
 
-    def tap(self):
+    def press(self):
         nav.push(TodoPage(self.todo, self.cfg))
 
 
@@ -93,7 +93,7 @@ class TodoItemKey(Key):
                    fill=(170, 170, 180) if not pressed else fg)
         return img
 
-    def tap(self):
+    def press(self):
         if not self.item.link:
             return
         path = os.path.expanduser(self.item.link)

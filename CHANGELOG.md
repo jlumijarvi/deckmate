@@ -3,6 +3,13 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Elgato's words where they have one: the text on a key is its "title" (the
+  keys.json field `label` is migrated to `title` on first read), a to-do list
+  opens as a "folder", keys are "pressed" rather than tapped, the backlight
+  timer is "Sleep after", and the settings window's Deck tab is "Device".
+
 ## 0.7.3 (2026-11-15)
 
 - Settings: the tray icon's Show button starts it as a transient user service,

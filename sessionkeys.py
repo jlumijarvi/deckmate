@@ -189,7 +189,7 @@ class SessionSlot(Key):
         return render_session(s, pressed, scroll_t=now - self.board.first_seen.get(s.session_id, now), now=now,
                               git=self.board.git.state(s.cwd))
 
-    def tap(self):
+    def press(self):
         s = self.session
         if s and s.cwd:
             launch("code " + shlex.quote(s.cwd))
@@ -213,7 +213,7 @@ class SessionSlot(Key):
 
 
 class CounterKey(Key):
-    """Number of sessions in one state; tap filters the board to that state
+    """Number of sessions in one state; press filters the board to that state
     (bright border while on); hold on the done counter dismisses every done session."""
     dynamic = True
 
@@ -235,7 +235,7 @@ class CounterKey(Key):
         code_mark(d, pressed)
         return img
 
-    def tap(self):
+    def press(self):
         self.board.view.toggle_filter(self.state)
         nav.dirty = True
 
@@ -273,7 +273,7 @@ class PagerKey(Key):
         code_mark(d, pressed)
         return img
 
-    def tap(self):
+    def press(self):
         self.board.view.turn(-1 if self.direction == "prev" else 1)
         nav.dirty = True
 
@@ -285,7 +285,7 @@ class PagerKey(Key):
 
 
 class DismissedSessionKey(Key):
-    """A dismissed session on the dismissed page; tap brings it back."""
+    """A dismissed session on the dismissed page; press brings it back."""
 
     def __init__(self, board, s):
         super().__init__({})
@@ -294,7 +294,7 @@ class DismissedSessionKey(Key):
     def render(self, pressed):
         return render_session(self.s, pressed, hidden=True)
 
-    def tap(self):
+    def press(self):
         self.board.view.restore(self.s.session_id)
         log.info(f"unhidden: {self.s.name}")
         nav.dirty = True

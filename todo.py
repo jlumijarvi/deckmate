@@ -20,7 +20,7 @@ BARE_PATH_RE = re.compile(r"(?<!\S)((?:~|\.{0,2})?/[^\s]+\.md)(?!\S)")
 SAMPLE = """# To do
 
 One item per line. A checked box hides the item. `@date` is the due date and a
-Markdown link opens that file when the key is tapped.
+Markdown link opens that file when the key is pressed.
 
 - [ ] Try the to-do key on the deck  @{today}
 - [ ] Sort out the backup disk  [plan](~/Documents/backup-plan.md)

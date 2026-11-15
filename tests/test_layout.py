@@ -21,7 +21,7 @@ def every_type(todo_file):
         "brightness": 60,
         "keys": {
             "0": {"type": "clock"},
-            "1": {"label": "A very long label that needs wrapping/and-shrinking", "color": "#1f6feb", "run": "true"},
+            "1": {"title": "A very long title that needs wrapping/and-shrinking", "color": "#1f6feb", "run": "true"},
             "2": {"type": "mute", "target": "source", "label": "Mic"},
             "3": {"type": "volume", "step": -5},
             "4": {"type": "slack"},
@@ -83,6 +83,18 @@ class LayoutTest(unittest.TestCase):
             self.assertEqual(len(page_keys), KEY_COUNT)
             self.render_all(page_keys)
 
+    def test_old_label_field_is_migrated_to_title(self):
+        with open(self.path, "w") as f:
+            json.dump({"keys": {"1": {"label": "Old", "run": "true"}, "2": {"type": "mute", "label": "Mic"}},
+                       "todo": {"label": "Tasks"}}, f)
+        keys, *_ = load_board(self.path)
+        self.assertEqual(keys[1].cfg["title"], "Old")
+        self.assertEqual(keys[2].cfg["title"], "Mic")
+        with open(self.path) as f:
+            text = f.read()
+        self.assertNotIn("label", text)
+        self.assertIn('"title": "Tasks"', text)
+
     def test_example_layout(self):
         keys, brightness, providers, saver = load_board(os.path.join(HERE, "keys.example.json"))
         self.assertEqual(len(keys), KEY_COUNT)
@@ -95,12 +107,12 @@ class LayoutTest(unittest.TestCase):
         self.assertFalse(keys[14].holdable)    # the next pager has no hold any more
         with open(self.todo) as f:
             todo_before = f.read()
-        keys[8].tap()    # 60 -> 80 with the key's own steps
+        keys[8].press()    # 60 -> 80 with the key's own steps
         with open(self.path) as f:
             self.assertEqual(json.load(f)["brightness"], 80)
         keys, *_ = load_board(self.path)
         self.assertEqual(keys[8].level, 80)
-        keys[8].tap()    # 80 -> wraps to 20
+        keys[8].press()    # 80 -> wraps to 20
         with open(self.path) as f:
             self.assertEqual(json.load(f)["brightness"], 20)
         with open(self.todo) as f:
@@ -110,10 +122,10 @@ class LayoutTest(unittest.TestCase):
         keys, *_ = load_board(self.path)
         nav.reset(keys)
         board = keys[13].board
-        keys[13].tap()
+        keys[13].press()
         self.assertEqual(nav.stack, [])
         self.assertEqual(board.view.page, 0)
-        keys[12].tap()    # the stats key is the way to the stats page
+        keys[12].press()    # the stats key is the way to the stats page
         self.assertIsInstance(nav.stack[-1], StatsPage)
 
 

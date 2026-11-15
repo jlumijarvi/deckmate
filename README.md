@@ -68,9 +68,9 @@ account's board lets go within two seconds and the new one takes over.
 ## Settings window
 
 The "Deckmate" app, or `deckmate settings`, opens a window with three pages.
-General: start or stop the board, brightness, screen saver. Keys: a grid laid
-out like the deck; click a key to set its type and the settings that belong to
-that key. Deck: the device details. Changes are written to keys.json straight
+General: start or stop the board, brightness, screen saver, sleep. Keys: a grid
+laid out like the deck; click a key to set its type and the settings that belong
+to that key. Device: the connected Stream Deck and the installed version. Changes are written to keys.json straight
 away and the running board picks them up within a second.
 
 Everything the window does can also be done by editing keys.json by hand.
@@ -85,9 +85,9 @@ a plain button with a shell command, or a live key:
   "brightness": 60,
   "keys": {
     "0": {"type": "clock"},
-    "1": {"label": "Terminal", "color": "#2d333b", "run": "ptyxis --new-window"},
-    "5": {"type": "mute", "target": "source", "label": "Mic"},
-    "6": {"type": "mute", "target": "sink", "label": "Speaker"},
+    "1": {"title": "Terminal", "color": "#2d333b", "run": "ptyxis --new-window"},
+    "5": {"type": "mute", "target": "source", "title": "Mic"},
+    "6": {"type": "mute", "target": "sink", "title": "Speaker"},
     "7": {"type": "volume", "step": -5},
     "8": {"type": "volume", "step": 5}
   },
@@ -96,21 +96,21 @@ a plain button with a shell command, or a live key:
 }
 ```
 
-| Type | Shows | Tap |
+| Type | Shows | Press |
 | --- | --- | --- |
-| (none) | the label | runs `run` in a shell, detached |
+| (none) | its title | runs `run` in a shell, detached |
 | `clock` | time and date | nothing |
 | `mute` | mic or speaker, on or MUTED | toggles it (PipeWire, `wpctl`) |
 | `volume` | speaker volume | changes it by `step` percent |
 | `brightness` | the deck's brightness | steps it 30 / 60 / 100 (or the key's `steps` list), written to keys.json |
 | `slack` | workspace name and a badge with the number of conversations that have unread messages, plus `@n` for mentions and DMs | opens that workspace in Slack |
-| `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a sub-deck |
+| `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a folder (a set of keys with a back key top left) |
 | `counter` (`state`: waiting, running or done) | how many sessions are in that state | shows only that state: bright border on the counter, empty slots and the pager name the filter, and it clears itself when no session is in that state any more; hold on the done counter hides every done session |
 | `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page; hold shows hidden sessions. next: next page |
 | `stats` | percent left in the five-hour plan window | opens the stats page |
 
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
-sessions fill them. Keys that need a wider label wrap and shrink the text
+sessions fill them. Titles that do not fit wrap and shrink
 automatically.
 
 ## Claude Code sessions
@@ -126,15 +126,15 @@ with how full the context window is. A small git dot bottom right appears
 when the session's folder is a repository: hollow for a dirty worktree,
 filled for clean but ahead of upstream.
 
-Tap opens the session's folder in VS Code, which raises the window that
+Press opens the session's folder in VS Code, which raises the window that
 already has it open. Hold (about half a second) hides the session from the
 board; a running session cannot be hidden. The previous-page key, held, shows
-the hidden sessions, and a tap on one brings it back. A session that changes
+the hidden sessions, and a press on one brings it back. A session that changes
 state sweeps a band of its new colour across the deck.
 
 When there are more sessions than slots, the pager keys turn pages. The
 counters show how many sessions are in each state and filter the board to one
-state when tapped.
+state when pressed.
 
 Every key that is about Claude Code (session slots, the counters, the pagers,
 the stats key and the stats tiles) wears a small orange `>_` in its
@@ -163,16 +163,16 @@ item per line:
 ```
 
 `@date` is the due date, a Markdown link (or a bare path ending in .md) is
-opened when the item's key is tapped. The file is watched, so saving it in an
+opened when the item's key is pressed. The file is watched, so saving it in an
 editor updates the deck within a second. Holding an item's key for about half
 a second ticks its box in the file (`- [ ]` becomes `- [x]`), which is the only
 write the deck ever makes to it; the switch "Hold an item's key to mark it
 done" in the settings turns that off.
 
-Tapping the key opens the list as a sub-deck: key 0 goes back, the other keys
+Pressing the key opens the list as a folder: key 0 goes back, the other keys
 are the items, overdue first, then by due date, then undated; with more than
 14 items keys 13 and 14 turn the pages. The settings live on the key itself
-(click it in the settings window): `file`, `label`, `open_with` (default
+(click it in the settings window): `file`, `title`, `open_with` (default
 `code`), `soon_days` (0 means only items due today count as "due soon"),
 `hold_done` (default true). Two to-do keys with different files give two lists.
 
@@ -192,8 +192,8 @@ the whole 480x272 screen, scaled to fill and cropped in the middle; the bezels
 will hide strips of it). Any key press brings the board back; that press does
 nothing else. `timeout_min: 0` turns the saver off.
 
-`sleep_min` is the deck's own timer for switching the backlight off when idle;
-0 means never. A key press wakes it.
+`sleep_min` ("Sleep after" in the settings) is the deck's own timer for
+switching the backlight off when idle; 0 means never. A key press wakes it.
 
 When the board stops it leaves the saver on the screen (the clock version
 shows only the date, since the time would freeze). The deck keeps showing it
