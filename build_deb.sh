@@ -20,7 +20,7 @@ done
 PYTHONPATH="$LIB" python3 -c "import deck, settings, tray, sessions, slackstate, todo, paths" 2>/dev/null \
     || PYTHONPATH="$LIB" python3 -c "import deck, sessions, slackstate, todo, paths" || { echo "staged modules do not import"; exit 1; }
 cp "$HERE/data/stream-deck" "$STAGE/usr/bin/"
-cp "$HERE/data/stream-deck.desktop" "$STAGE/usr/share/applications/"
+cp "$HERE/data/io.github.jlumijarvi.StreamDeck.desktop" "$STAGE/usr/share/applications/"
 cp "$HERE/data/stream-deck-tray.desktop" "$STAGE/etc/xdg/autostart/"
 cp "$HERE/data/stream-deck.service" "$STAGE/usr/lib/systemd/user/"
 cp "$HERE/data/icons/"*.svg "$STAGE/usr/share/icons/hicolor/scalable/apps/"

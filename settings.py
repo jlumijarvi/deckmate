@@ -18,6 +18,11 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
+# must equal the desktop file's name so GNOME groups the window under its own
+# dock icon instead of guessing (it ended up in the VS Code group)
+APP_ID = "io.github.jlumijarvi.StreamDeck"
+GLib.set_prgname(APP_ID)
+
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, ROWS, KEY_COUNT  # noqa: E402
 from slackstate import SlackState  # noqa: E402
 
@@ -592,7 +597,7 @@ class SettingsWindow(Adw.ApplicationWindow):
 
 class App(Adw.Application):
     def __init__(self, screenshot=None, page=None, key=None):
-        super().__init__(application_id="io.github.jlumijarvi.streamdeck.settings",
+        super().__init__(application_id=APP_ID,
                          flags=Gio.ApplicationFlags.NON_UNIQUE)
         self.screenshot = screenshot
         self.page = page
