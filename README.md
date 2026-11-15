@@ -33,10 +33,13 @@ which is what gives your account access to the device node; no udev rule is
 needed.
 
 Command line: `deckmate settings | board | sessions | tray | --version`.
+"Quit tray icon" in the icon's menu only ends the icon; the board keeps
+running, and the icon comes back at the next login or with the "Show" button
+on the settings window's General page.
 
 ## Updates
 
-The top-bar icon checks GitHub every six hours for a newer release and
+The top-bar icon checks GitHub every hour for a newer release and
 installs it on its own (switch "Install updates automatically" in the
 settings; off means it only offers the update in its menu). The install runs
 the root helper `/usr/lib/deckmate/install-update` through pkexec; the polkit

@@ -8,6 +8,7 @@ and stops the board, and can replace the picture stored inside the deck.
 """
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -26,7 +27,7 @@ GLib.set_prgname(APP_ID)
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, KEY_COUNT  # noqa: E402
 from slackstate import SlackState  # noqa: E402
 
-from paths import HERE, CONFIG, EXAMPLE, PID_FILE, config_path, version  # noqa: E402
+from paths import HERE, CONFIG, EXAMPLE, PID_FILE, TRAY_PID_FILE, config_path, version  # noqa: E402
 
 DECK_PY = os.path.join(HERE, "deck.py")
 
@@ -177,13 +178,34 @@ def key_summary(cfg, i):
 
 # --- the board process -------------------------------------------------------
 
-def board_pid():
+def pid_from(path):
     try:
-        with open(PID_FILE) as f:
+        with open(path) as f:
             pid = int(f.read().strip())
     except (OSError, ValueError):
         return None
     return pid if os.path.exists(f"/proc/{pid}") else None
+
+
+def board_pid():
+    return pid_from(PID_FILE)
+
+
+def tray_pid():
+    return pid_from(TRAY_PID_FILE)
+
+
+def start_tray():
+    """Start the top-bar icon again after "Quit tray icon". In a systemd scope of
+    its own, so it outlives this window and GNOME does not file it under it."""
+    cmd = [sys.executable, os.path.join(HERE, "tray.py")]
+    if shutil.which("systemd-run"):
+        unit = f"app-deckmate-tray-{os.getpid()}-{int(time.time())}"
+        subprocess.Popen(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit", unit] + cmd,
+                         cwd=HERE, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return
+    subprocess.Popen(cmd, cwd=HERE, start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 SERVICE = "deckmate.service"
@@ -451,6 +473,12 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.status_row.add_suffix(self.start_btn)
         self.status_row.add_suffix(self.stop_btn)
         g.add(self.status_row)
+        self.tray_row = Adw.ActionRow(title="Tray icon")
+        self.tray_btn = Gtk.Button(label="Show")
+        self.tray_btn.set_valign(Gtk.Align.CENTER)
+        self.tray_btn.connect("clicked", lambda *_: (start_tray(), GLib.timeout_add(1500, self.refresh_status)))
+        self.tray_row.add_suffix(self.tray_btn)
+        g.add(self.tray_row)
         page.add(g)
 
         g = Adw.PreferencesGroup(title="Display")
@@ -496,7 +524,7 @@ class SettingsWindow(Adw.ApplicationWindow):
 
         g = Adw.PreferencesGroup(title="Updates")
         self.auto_update = Adw.SwitchRow(title="Install updates automatically")
-        self.auto_update.set_subtitle("The tray icon checks GitHub every six hours and installs a newer "
+        self.auto_update.set_subtitle("The tray icon checks GitHub every hour and installs a newer "
                                       "release without asking. Off: it only offers the update in its menu.")
         self.auto_update.set_active(bool(self.cfg.get("updates", {}).get("auto", True)))
         self.auto_update.connect("notify::active", self.on_auto_update)
@@ -547,6 +575,9 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.status_row.set_subtitle((f"running, pid {pid}" if pid else "not running") + how)
         self.start_btn.set_sensitive(pid is None)
         self.stop_btn.set_sensitive(pid is not None)
+        tray = tray_pid()
+        self.tray_row.set_subtitle("in the top bar" if tray else "not running (starts again at login)")
+        self.tray_btn.set_sensitive(tray is None)
         return True
 
     # -- keys page --
@@ -604,6 +635,11 @@ class SettingsWindow(Adw.ApplicationWindow):
         except (OSError, UnsupportedDeck) as e:
             self.device_row.set_subtitle(str(e))
             self.lcd_gallery = 4
+
+        g = Adw.PreferencesGroup(title="Deckmate")
+        row = Adw.ActionRow(title="Version", subtitle=f"{version()}, installed in {HERE}")
+        g.add(row)
+        page.add(g)
 
         g = Adw.PreferencesGroup(
             title="Stored image (boot logo)",

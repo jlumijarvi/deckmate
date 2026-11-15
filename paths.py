@@ -16,6 +16,7 @@ EXAMPLE = os.path.join(HERE, "keys.example.json")
 
 RUNTIME_DIR = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/deckmate-{os.getuid()}", "deckmate")
 PID_FILE = os.path.join(RUNTIME_DIR, "deck.pid")
+TRAY_PID_FILE = os.path.join(RUNTIME_DIR, "tray.pid")
 STATUS_FILE = os.path.join(RUNTIME_DIR, "status.json")
 
 STATE_FILE = os.path.join(CONFIG_DIR, "state.json")

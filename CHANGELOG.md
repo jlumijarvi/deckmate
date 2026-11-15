@@ -3,6 +3,13 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Settings: a Version row on the Deck page, and a "Tray icon" row on the
+  General page with a Show button that brings the icon back after "Quit tray
+  icon".
+- The tray checks for updates every hour instead of every six.
+
 ## 0.7.1 (2026-11-15)
 
 - New `brightness` key type: shows the level, tap steps it 30 / 60 / 100 (or

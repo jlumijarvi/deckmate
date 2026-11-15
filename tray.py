@@ -22,10 +22,11 @@ gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import GLib, Gtk  # noqa: E402
 from gi.repository import AyatanaAppIndicator3 as AppIndicator  # noqa: E402
 
-from paths import HERE, INSTALLED, PID_FILE, REPO, STATUS_FILE, config_path, ensure_dirs, version  # noqa: E402
+from paths import (HERE, INSTALLED, PID_FILE, REPO, STATUS_FILE, TRAY_PID_FILE,  # noqa: E402
+                   config_path, ensure_dirs, version)
 
 SERVICE = "deckmate.service"
-UPDATE_CHECK_S = 6 * 3600
+UPDATE_CHECK_S = 3600
 INSTALL_HELPER = "/usr/lib/deckmate/install-update"   # root helper, passwordless through polkit
 ICON = "deckmate-symbolic"
 ICON_ATTENTION = "deckmate-attention-symbolic"
@@ -306,9 +307,17 @@ class Tray:
 def main():
     ensure_dirs()
     adopt_service()
+    with open(TRAY_PID_FILE, "w") as f:    # lets the settings window see that the icon is up
+        f.write(str(os.getpid()))
     Tray()
     signal.signal(signal.SIGINT, signal.SIG_DFL)
-    Gtk.main()
+    try:
+        Gtk.main()
+    finally:
+        try:
+            os.remove(TRAY_PID_FILE)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":
