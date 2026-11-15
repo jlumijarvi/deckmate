@@ -22,7 +22,7 @@ def every_type(todo_file):
         "keys": {
             "0": {"type": "clock"},
             "1": {"title": "A very long title that needs wrapping/and-shrinking", "color": "#1f6feb", "run": "true"},
-            "2": {"type": "mute", "target": "source", "label": "Mic"},
+            "2": {"type": "mute", "target": "source", "title": "Mic"},
             "3": {"type": "volume", "step": -5},
             "4": {"type": "slack"},
             "8": {"type": "brightness", "steps": [20, 80]},
