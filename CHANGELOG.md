@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.7.3 (2026-11-15)
 
 - Settings: the tray icon's Show button starts it as a transient user service,
   so it gets a clean session environment whatever started the window.
