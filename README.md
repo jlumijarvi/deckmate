@@ -29,8 +29,11 @@ Command line: `stream-deck settings | board | sessions | tray | --version`.
 ## Releasing a new version
 
 Develop in a git checkout, commit, then `./release.sh 0.2.0`. That bumps
-VERSION, tags, builds the `.deb` with `./build_deb.sh` and publishes a GitHub
+VERSION, tags and pushes. The GitHub Actions workflow in
+`.github/workflows/ci.yml` runs the unit tests on every push, builds the
+`.deb`, installs it on the runner, and on a `v*` tag publishes the GitHub
 release with the package attached, which is what the tray icons look for.
+The script waits for that run and prints the release link.
 
 ## Files
 
@@ -48,6 +51,7 @@ release with the package attached, which is what the tray icons look for.
 | `paths.py` | where config, pid and status files live |
 | `install_service.sh` | git-checkout alternative to the package: a per-user login service |
 | `build_deb.sh`, `release.sh`, `packaging/`, `data/` | the Debian package, desktop files, icons |
+| `.github/workflows/ci.yml` | tests, package build and release publishing on GitHub |
 | `hello_deck.py` | the first test: numbered colour tiles, prints key presses |
 
 ## Run

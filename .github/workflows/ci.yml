@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  build:
+    name: Test and build the package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the runtime dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            python3-pil python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-gtk-3.0 \
+            gir1.2-ayatanaappindicator3-0.1 fonts-dejavu-core
+
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Every module must import
+        run: python3 -c "import deck, settings, tray, sessions, slackstate, todo, stats, gitinfo, board, paths"
+
+      - name: Tag must match VERSION
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          test "v$(cat VERSION)" = "${GITHUB_REF_NAME}" \
+            || { echo "VERSION is $(cat VERSION) but the tag is ${GITHUB_REF_NAME}"; exit 1; }
+
+      - name: Build the .deb
+        run: ./build_deb.sh
+
+      - name: Install the .deb on the runner
+        run: |
+          sudo apt-get install -y -q ./dist/stream-deck_*_all.deb
+          stream-deck --version
+          dpkg -L stream-deck
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stream-deck-deb
+          path: dist/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Publish the GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: stream-deck-deb
+          path: dist
+
+      - name: Create the release with the .deb attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+                 --title "$TAG" --notes "stream-deck ${TAG#v}"
+          gh release upload "$TAG" dist/*.deb --repo "$GITHUB_REPOSITORY" --clobber
