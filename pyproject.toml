@@ -1,0 +1,18 @@
+# Only tool settings live here; the program is installed as a .deb, not a wheel.
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# pyflakes, pycodestyle, bugbear
+select = ["E", "F", "W", "B"]
+ignore = [
+    "E731",   # lambdas assigned to names are used on purpose for short callbacks
+    "B007",   # unused loop variables are kept for the tuple shape
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]   # sys.path is set up before the imports
+"settings.py" = ["E402"]
+"tray.py" = ["E402"]

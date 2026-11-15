@@ -20,12 +20,15 @@ jobs:
             python3-pil python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-gtk-3.0 \
             gir1.2-ayatanaappindicator3-0.1 fonts-dejavu-core
 
+      - name: Lint (ruff)
+        run: pipx run ruff check .
+
       - name: Unit tests
         run: python3 -m unittest discover -s tests -v
 
       - name: Every module must import (tray uses GTK 3, settings GTK 4, so two processes)
         run: |
-          python3 -c "import deck, settings, sessions, slackstate, todo, stats, gitinfo, board, paths"
+          python3 -c "import $(ls *.py | grep -v -e '^tray.py$' -e '^hello_deck.py$' | sed 's/\.py$//' | paste -sd,)"
           python3 -c "import tray"
 
       - name: Tag must match VERSION
@@ -33,6 +36,7 @@ jobs:
         run: |
           test "v$(cat VERSION)" = "${GITHUB_REF_NAME}" \
             || { echo "VERSION is $(cat VERSION) but the tag is ${GITHUB_REF_NAME}"; exit 1; }
+          ./changelog.sh "$(cat VERSION)" >/dev/null
 
       - name: Build the .deb
         run: ./build_deb.sh
@@ -62,6 +66,13 @@ jobs:
           name: deckmate-deb
           path: dist
 
+      - uses: actions/checkout@v4
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          ./changelog.sh "${GITHUB_REF_NAME#v}" > notes.md
+          cat notes.md
+
       - name: Create the release with the .deb attached
         env:
           GH_TOKEN: ${{ github.token }}
@@ -69,5 +80,5 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-                 --title "$TAG" --notes "deckmate ${TAG#v}"
+                 --title "$TAG" --notes-file notes.md
           gh release upload "$TAG" dist/*.deb --repo "$GITHUB_REPOSITORY" --clobber
