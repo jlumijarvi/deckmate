@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.8.0 (2026-11-15)
 
 - New `media` key type for Spotify (or any MPRIS player): play/pause with the
   track and its cover, next track, previous track. Over the session D-Bus, no
