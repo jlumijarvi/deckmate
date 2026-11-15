@@ -27,24 +27,39 @@ DECK_PY = os.path.join(HERE, "deck.py")
 
 KEY_KINDS = [
     ("empty", "Empty"),
-    ("command", "Button (runs a command)"),
+    ("command", "Button"),
     ("clock", "Clock"),
     ("mute_source", "Mic mute"),
     ("mute_sink", "Speaker mute"),
     ("volume_down", "Volume down"),
     ("volume_up", "Volume up"),
-    ("session", "Claude session slot"),
     ("slack", "Slack unread badge"),
     ("todo", "To-do list"),
-    ("counter_waiting", "Sessions waiting: count and filter"),
-    ("counter_running", "Sessions running: count and filter"),
-    ("counter_done", "Sessions done: count and filter"),
-    ("pager_prev", "Sessions: previous page / stats (hold: dismissed)"),
-    ("pager_next", "Sessions: next page (hold: brightness)"),
-    ("stats", "Stats page (plan quota, tokens today)"),
+    ("session", "Claude: session slot"),
+    ("counter_waiting", "Claude: waiting count"),
+    ("counter_running", "Claude: running count"),
+    ("counter_done", "Claude: done count"),
+    ("pager_prev", "Claude: previous page"),
+    ("pager_next", "Claude: next page"),
+    ("stats", "Claude: stats"),
 ]
 KIND_INDEX = {k: i for i, (k, _) in enumerate(KEY_KINDS)}
 KIND_LABEL = dict(KEY_KINDS)
+# shown under the type row; the short labels above must fit the dropdown
+KIND_HINT = {
+    "command": "Runs a shell command when tapped",
+    "mute_source": "Toggles the microphone; the key shows its state",
+    "mute_sink": "Toggles the speakers; the key shows its state",
+    "slack": "Unread count and @mentions of one Slack workspace",
+    "todo": "Open items in a Markdown task list; tap opens them as a sub-deck",
+    "session": "One running Claude Code session. Tap opens its folder in VS Code, hold dismisses it",
+    "counter_waiting": "Sessions asking you something. Tap filters the slots to them",
+    "counter_running": "Sessions still working. Tap filters the slots to them",
+    "counter_done": "Finished sessions. Tap filters, hold dismisses them all",
+    "pager_prev": "Previous page of sessions; on the first page the stats page. Hold: dismissed sessions",
+    "pager_next": "Next page of sessions. Hold: cycle brightness 30 / 60 / 100",
+    "stats": "Opens the stats page: plan quota, tokens today, cache reads, fullest context",
+}
 
 
 # --- config ------------------------------------------------------------------
@@ -265,6 +280,10 @@ class KeyDialog(Adw.Dialog):
         self.kind_row.connect("notify::selected", lambda *_: self.update_rows())
         group.add(self.kind_row)
 
+        self.hint = Gtk.Label(xalign=0, wrap=True, css_classes=["dim-label", "caption"],
+                              margin_start=12, margin_end=12, margin_top=6, margin_bottom=6)
+        group.add(self.hint)
+
         self.label_row = Adw.EntryRow(title="Label (use \\n for a line break)")
         self.label_row.set_text(k.get("label", "").replace("\n", "\\n"))
         group.add(self.label_row)
@@ -332,6 +351,8 @@ class KeyDialog(Adw.Dialog):
 
     def update_rows(self):
         kind = self.kind()
+        self.hint.set_text(KIND_HINT.get(kind, ""))
+        self.hint.set_visible(kind in KIND_HINT)
         self.label_row.set_visible(kind in ("command", "mute_source", "mute_sink", "todo"))
         self.color_row.set_visible(kind == "command")
         self.run_row.set_visible(kind == "command")
