@@ -22,10 +22,11 @@ gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import GLib, Gtk  # noqa: E402
 from gi.repository import AyatanaAppIndicator3 as AppIndicator  # noqa: E402
 
-from paths import HERE, INSTALLED, PID_FILE, REPO, STATUS_FILE, ensure_dirs, version  # noqa: E402
+from paths import HERE, INSTALLED, PID_FILE, REPO, STATUS_FILE, config_path, ensure_dirs, version  # noqa: E402
 
 SERVICE = "stream-deck.service"
-UPDATE_CHECK_S = 24 * 3600
+UPDATE_CHECK_S = 6 * 3600
+INSTALL_HELPER = "/usr/lib/stream-deck/install-update"   # root helper, passwordless through polkit
 ICON = "stream-deck-symbolic"
 ICON_ATTENTION = "stream-deck-attention-symbolic"
 ICON_OFF = "stream-deck-off-symbolic"
@@ -80,6 +81,15 @@ def adopt_service():
                 sh("systemctl", "--user", "daemon-reload")
     if service_loaded():
         sh("systemctl", "--user", "start", SERVICE)
+
+
+def auto_update_enabled():
+    """The "Install updates automatically" switch in the settings (default on)."""
+    try:
+        with open(config_path()) as f:
+            return bool(json.load(f).get("updates", {}).get("auto", True))
+    except (OSError, ValueError):
+        return True
 
 
 def version_tuple(v):
@@ -228,7 +238,11 @@ class Tray:
         if version_tuple(tag) > version_tuple(version()) and asset:
             self.update = (tag, asset["browser_download_url"], asset["name"], via_gh)
             self.update_item.set_label(f"Update to {tag}…")
-            notify(f"Stream Deck {tag} is available", "Use the tray menu to install it.")
+            if quiet and auto_update_enabled():
+                notify(f"Stream Deck {tag} is available", "Installing it now.")
+                self.install_update()
+            else:
+                notify(f"Stream Deck {tag} is available", "Use the tray menu to install it.")
         else:
             self.update = None
             self.update_item.set_label("Check for updates")
@@ -254,8 +268,13 @@ class Tray:
             except Exception as e:
                 GLib.idle_add(notify, "Stream Deck update failed", f"download: {e}")
                 return
-            # pkexec asks for the password in a desktop dialog
-            r = subprocess.run(["pkexec", "apt-get", "install", "-y", path], capture_output=True, text=True)
+            # the packaged helper needs no password (polkit action); a git checkout
+            # falls back to apt-get, and pkexec asks for the password in a dialog
+            if os.path.exists(INSTALL_HELPER):
+                cmd = ["pkexec", INSTALL_HELPER, path]
+            else:
+                cmd = ["pkexec", "apt-get", "install", "-y", path]
+            r = subprocess.run(cmd, capture_output=True, text=True)
             if r.returncode != 0:
                 GLib.idle_add(notify, "Stream Deck update failed", (r.stderr or r.stdout).strip()[-300:])
                 return

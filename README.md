@@ -19,8 +19,12 @@ top-bar icon with a menu (board status, start/stop, settings, updates), and a
 its own layout in `~/.config/stream-deck/keys.json`.
 
 The top-bar icon needs GNOME's AppIndicator extension, which Ubuntu enables by
-default. The tray icon checks GitHub once a day for a newer release and offers
-to install it from its menu; the install asks for your password. While the
+default. The tray icon checks GitHub every six hours for a newer release and
+installs it on its own (switch "Install updates automatically" in the settings;
+off means it only offers the update in its menu). The install runs the root
+helper `/usr/lib/stream-deck/install-update` through pkexec; the polkit action
+shipped with the package lets a logged-in user do that without a password, and
+the helper accepts nothing but a package named stream-deck. While the
 repository is private, the check goes through the `gh` tool, so run
 `gh auth login` once in each account.
 

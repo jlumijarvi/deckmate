@@ -489,7 +489,20 @@ class SettingsWindow(Adw.ApplicationWindow):
         page.add(g)
         self.update_saver_rows()
 
+        g = Adw.PreferencesGroup(title="Updates")
+        self.auto_update = Adw.SwitchRow(title="Install updates automatically")
+        self.auto_update.set_subtitle("The tray icon checks GitHub every six hours and installs a newer "
+                                      "release without asking. Off: it only offers the update in its menu.")
+        self.auto_update.set_active(bool(self.cfg.get("updates", {}).get("auto", True)))
+        self.auto_update.connect("notify::active", self.on_auto_update)
+        g.add(self.auto_update)
+        page.add(g)
+
         return page
+
+    def on_auto_update(self, *_):
+        self.cfg.setdefault("updates", {})["auto"] = self.auto_update.get_active()
+        self.save_soon()
 
     def on_brightness(self, *_):
         self.cfg["brightness"] = int(self.brightness.get_value())

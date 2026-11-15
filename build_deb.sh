@@ -11,7 +11,7 @@ python3 -m unittest discover -s "$HERE/tests" -q 2>&1 | tail -1 | grep -q "^OK" 
 
 mkdir -p "$LIB" "$STAGE/DEBIAN" "$STAGE/usr/bin" "$STAGE/usr/share/applications" \
          "$STAGE/etc/xdg/autostart" "$STAGE/usr/lib/systemd/user" \
-         "$STAGE/usr/share/icons/hicolor/scalable/apps"
+         "$STAGE/usr/share/icons/hicolor/scalable/apps" "$STAGE/usr/share/polkit-1/actions"
 # every module, so a new file cannot be forgotten; hello_deck.py is a dev-only test
 for f in "$HERE"/*.py "$HERE/keys.example.json" "$HERE/VERSION"; do
     case "$(basename "$f")" in hello_deck.py) ;; *) cp "$f" "$LIB/" ;; esac
@@ -24,11 +24,15 @@ cp "$HERE/data/io.github.jlumijarvi.StreamDeck.desktop" "$STAGE/usr/share/applic
 cp "$HERE/data/stream-deck-tray.desktop" "$STAGE/etc/xdg/autostart/"
 cp "$HERE/data/stream-deck.service" "$STAGE/usr/lib/systemd/user/"
 cp "$HERE/data/icons/"*.svg "$STAGE/usr/share/icons/hicolor/scalable/apps/"
+cp "$HERE/data/install-update" "$LIB/"
+cp "$HERE/data/io.github.jlumijarvi.StreamDeck.policy" "$STAGE/usr/share/polkit-1/actions/"
 sed "s/@VERSION@/$VERSION/" "$HERE/packaging/control" > "$STAGE/DEBIAN/control"
 cp "$HERE/packaging/postinst" "$HERE/packaging/prerm" "$HERE/packaging/postrm" "$STAGE/DEBIAN/"
 chmod 755 "$STAGE/DEBIAN/postinst" "$STAGE/DEBIAN/prerm" "$STAGE/DEBIAN/postrm" "$STAGE/usr/bin/stream-deck"
 chmod 644 "$LIB"/* "$STAGE/usr/share/applications/"* "$STAGE/etc/xdg/autostart/"* \
-          "$STAGE/usr/lib/systemd/user/"* "$STAGE/usr/share/icons/hicolor/scalable/apps/"*
+          "$STAGE/usr/lib/systemd/user/"* "$STAGE/usr/share/icons/hicolor/scalable/apps/"* \
+          "$STAGE/usr/share/polkit-1/actions/"*
+chmod 755 "$LIB/install-update"
 
 mkdir -p "$HERE/dist"
 OUT="$HERE/dist/stream-deck_${VERSION}_all.deb"
