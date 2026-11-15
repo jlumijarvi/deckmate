@@ -98,13 +98,15 @@ class LayoutTest(unittest.TestCase):
         with open(self.todo) as f:
             self.assertEqual(f.read(), todo_before)
 
-    def test_prev_pager_opens_stats_from_the_first_page(self):
+    def test_prev_pager_on_the_first_page_stays_put(self):
         keys, *_ = load_board(self.path)
         nav.reset(keys)
+        board = keys[13].board
         keys[13].tap()
-        self.assertIsInstance(nav.stack[-1], StatsPage)
-        nav.pop()
         self.assertEqual(nav.stack, [])
+        self.assertEqual(board.view.page, 0)
+        keys[12].tap()    # the stats key is the way to the stats page
+        self.assertIsInstance(nav.stack[-1], StatsPage)
 
 
 if __name__ == "__main__":

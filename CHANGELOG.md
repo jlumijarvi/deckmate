@@ -5,6 +5,8 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- The prev pager key only turns pages; the stats page is opened by the `stats`
+  key alone. (Before, a tap on the first page opened the stats page.)
 - CI: the release job checks out the repository before downloading the built
   package, so the package is attached (0.7.0's was attached by hand).
 

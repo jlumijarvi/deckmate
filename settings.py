@@ -61,7 +61,7 @@ KIND_HINT = {
     "counter_waiting": "Sessions asking you something. Tap filters the slots to them",
     "counter_running": "Sessions still working. Tap filters the slots to them",
     "counter_done": "Finished sessions. Tap filters, hold dismisses them all",
-    "pager_prev": "Previous page of sessions; on the first page the stats page. Hold: dismissed sessions",
+    "pager_prev": "Previous page of sessions. Hold: dismissed sessions",
     "pager_next": "Next page of sessions. Hold: cycle brightness 30 / 60 / 100",
     "stats": "Opens the stats page: plan quota, tokens today, cache reads, fullest context",
 }

@@ -102,7 +102,7 @@ a plain button with a shell command, or a live key:
 | `slack` | workspace name and a badge with the number of conversations that have unread messages, plus `@n` for mentions and DMs | opens that workspace in Slack |
 | `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a sub-deck |
 | `counter` (`state`: waiting, running or done) | how many sessions are in that state | filters the board to that state, bright border while on; hold on the done counter hides every done session |
-| `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page, or the stats page from the first; hold shows hidden sessions. next: next page; hold cycles brightness 30 / 60 / 100 |
+| `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page; hold shows hidden sessions. next: next page; hold cycles brightness 30 / 60 / 100 |
 | `stats` | percent left in the five-hour plan window | opens the stats page |
 
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
@@ -138,8 +138,7 @@ bottom-left corner, so they stand out from ordinary buttons.
 
 ### Stats page
 
-Reached from the previous-page key on the first page, or from a `stats` key.
-Tiles: percent left in the five-hour and seven-day plan windows as the Claude
+Opened by a `stats` key. Tiles: percent left in the five-hour and seven-day plan windows as the Claude
 desktop app last sampled them, tokens today (output large, input and cache
 writes small), cache reads today with the number of replies, and the fullest
 context among the sessions on the board. When a plan window resets the deck

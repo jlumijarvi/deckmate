@@ -14,7 +14,6 @@ from pages import NavKey, nav
 from paths import STATE_FILE
 from render import STATE_COLORS, code_mark, dim, draw_centered_lines, fit_lines, font, tile
 from sessions import Session, SessionScanner, elapsed_text
-from statskeys import StatsPage
 from system import launch
 
 log = logging.getLogger("deck")
@@ -242,8 +241,8 @@ class CounterKey(Key):
 
 
 class PagerKey(Key):
-    """prev: previous session page, from the first page the stats page; hold shows the
-    dismissed sessions. next: next page; hold cycles brightness 30 / 60 / 100."""
+    """prev: previous session page; hold shows the dismissed sessions.
+    next: next page; hold cycles brightness 30 / 60 / 100."""
     dynamic = True
     holdable = True
 
@@ -257,23 +256,13 @@ class PagerKey(Key):
         img, d, fg = tile((36, 36, 44), pressed)
         symbol = "<" if self.direction == "prev" else ">"
         draw_centered_lines(d, [symbol], fg, size=30, top=10)
-        if self.direction == "prev" and v.page == 0:
-            label = "stats"
-        else:
-            label = f"{v.page + 1}/{pages}"
+        label = f"{v.page + 1}/{pages}"
         draw_centered_lines(d, [label], (170, 170, 180) if not pressed else fg, size=11, top=50, bold=False)
         code_mark(d, pressed)
         return img
 
     def tap(self):
-        v = self.board.view
-        if self.direction == "prev":
-            if v.page == 0:
-                nav.push(StatsPage(self.board))
-            else:
-                v.turn(-1)
-        else:
-            v.turn(1)
+        self.board.view.turn(-1 if self.direction == "prev" else 1)
         nav.dirty = True
 
     def hold(self):
