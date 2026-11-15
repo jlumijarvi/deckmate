@@ -32,6 +32,7 @@ Usage:
 """
 import argparse
 import json
+import math
 import os
 import re
 import shlex
@@ -150,14 +151,15 @@ def tile(bg, pressed=False):
     return img, ImageDraw.Draw(img), (0, 0, 0) if pressed else (255, 255, 255)
 
 
-def draw_centered_lines(d, lines, fg, size=14, top=None, bold=True):
+def draw_centered_lines(d, lines, fg, size=14, top=None, bold=True, left=0):
+    """Centred in the key, or in the part right of `left` (room for a corner mark)."""
     f = font(size, bold)
     line_h = size + 3
     total = line_h * len(lines)
     y = (KEY_PX - total) / 2 if top is None else top
     for line in lines:
         w = d.textlength(line, font=f)
-        d.text(((KEY_PX - w) / 2, y), line, font=f, fill=fg)
+        d.text((left + (KEY_PX - left - w) / 2, y), line, font=f, fill=fg)
         y += line_h
 
 
@@ -310,6 +312,20 @@ def dim(color, f=0.22):
     return tuple(int(c * f) for c in color)
 
 
+CLAUDE = (217, 119, 87)   # the terracotta of the Claude logo
+MARK_W = 17               # width the corner mark takes from the left edge
+
+
+def claude_mark(d, pressed, cx=9, cy=KEY_PX - 10):
+    """A small sunburst in the bottom-left corner: this key is about Claude Code."""
+    color = (0, 0, 0) if pressed else CLAUDE
+    for i in range(8):
+        a = math.pi / 4 * i
+        r = 5.5 if i % 2 == 0 else 3.5
+        d.line([(cx, cy), (cx + r * math.cos(a), cy + r * math.sin(a))], fill=color, width=1)
+    d.ellipse([cx - 1.5, cy - 1.5, cx + 1.5, cy + 1.5], fill=color)
+
+
 DEMO = False
 
 
@@ -445,6 +461,7 @@ def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None):
         cx, cy = KEY_PX - 8, KEY_PX - 11
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(200, 200, 210) if kind == "filled" else None,
                   outline=(200, 200, 210), width=1)
+    claude_mark(d, pressed)
     return img
 
 
@@ -513,6 +530,7 @@ class CounterKey(Key):
             d.rectangle([0, 0, KEY_PX - 1, KEY_PX - 1], outline=color, width=3)
         draw_centered_lines(d, [self.state], fg if n else (150, 150, 160), size=12, top=9)
         draw_centered_lines(d, [str(n)], fg if n else (150, 150, 160), size=30, top=26)
+        claude_mark(d, pressed)
         return img
 
     def tap(self):
@@ -550,6 +568,7 @@ class PagerKey(Key):
         else:
             label = f"{v.page + 1}/{pages}"
         draw_centered_lines(d, [label], (170, 170, 180) if not pressed else fg, size=11, top=50, bold=False)
+        claude_mark(d, pressed)
         return img
 
     def tap(self):
@@ -665,7 +684,9 @@ class StatsKey(Key):
             d.rectangle([0, 0, KEY_PX, 4], fill=color)
         draw_centered_lines(d, [self.cfg.get("label") or "stats"], fg, size=12, top=9)
         draw_centered_lines(d, ["—" if left is None else f"{left}%"], fg, size=26, top=24)
-        draw_centered_lines(d, ["5h left"], (200, 200, 210) if not pressed else fg, size=10, top=56, bold=False)
+        draw_centered_lines(d, ["5h left"], (200, 200, 210) if not pressed else fg, size=10, top=56, bold=False,
+                            left=MARK_W)
+        claude_mark(d, pressed)
         return img
 
     def tap(self):
@@ -688,8 +709,10 @@ class StatTile(Key):
         lines, size = fit_lines(self.value, max_lines=1, sizes=(26, 22, 18, 14, 11))
         draw_centered_lines(d, lines, fg, size=size, top=24)
         if self.foot:
-            lines, fsize = fit_lines(self.foot, max_lines=1, sizes=(10, 9))
-            draw_centered_lines(d, lines, (200, 200, 210) if not pressed else fg, size=fsize, top=56, bold=False)
+            lines, fsize = fit_lines(self.foot, max_lines=1, sizes=(10, 9), width=KEY_PX - MARK_W - 4)
+            draw_centered_lines(d, lines, (200, 200, 210) if not pressed else fg, size=fsize, top=56, bold=False,
+                                left=MARK_W)
+        claude_mark(d, pressed)
         return img
 
 

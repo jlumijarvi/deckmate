@@ -174,6 +174,10 @@ Session keys also carry a small git dot bottom right when the session's folder
 is a repository: hollow for a dirty worktree, filled for clean but ahead of
 upstream, none otherwise. Git runs in a background thread every 30 seconds.
 
+Every key that is about Claude Code (session slots, the counters, the pagers,
+the stats key and the stats tiles) wears a small terracotta sunburst in its
+bottom-left corner, so they stand out from ordinary buttons.
+
 ## Log
 
 The board logs to the journal (`journalctl --user -u stream-deck`) and to
