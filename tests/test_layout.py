@@ -25,6 +25,8 @@ def every_type(todo_file):
             "2": {"type": "mute", "target": "source", "title": "Mic"},
             "3": {"type": "volume", "step": -5},
             "4": {"type": "slack"},
+            "6": {"type": "media"},
+            "7": {"type": "media", "action": "next"},
             "8": {"type": "brightness", "steps": [20, 80]},
             "9": {"type": "todo", "file": todo_file, "soon_days": 2},
             "10": {"type": "counter", "state": "waiting"},
@@ -33,9 +35,8 @@ def every_type(todo_file):
             "13": {"type": "pager", "dir": "prev"},
             "14": {"type": "pager", "dir": "next"},
             "99": {"type": "command"},
-            "7": {"type": "nonsense"},
         },
-        "sessions": {"keys": [5, 6, 7]},
+        "sessions": {"keys": [5]},
         "screensaver": {"image": "clock", "timeout_min": 5},
     }
 
@@ -64,7 +65,7 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(len(keys), KEY_COUNT)
         self.assertEqual(brightness, 60)
         self.assertTrue(saver.enabled and saver.is_tiles)
-        self.assertEqual([type(k).__name__ for k in keys[5:9]], ["SessionSlot"] * 3 + ["Brightness"])
+        self.assertEqual([type(k).__name__ for k in keys[5:9]], ["SessionSlot", "Media", "Media", "Brightness"])
         self.assertIsInstance(keys[9], TodoKey)
         self.assertEqual(keys[9].todo.soon_days, 2)
         keys[9].todo.refresh()
@@ -94,6 +95,12 @@ class LayoutTest(unittest.TestCase):
             text = f.read()
         self.assertNotIn("label", text)
         self.assertIn('"title": "Tasks"', text)
+
+    def test_unknown_type_and_bad_index_are_ignored(self):
+        with open(self.path, "w") as f:
+            json.dump({"keys": {"3": {"type": "nonsense"}, "99": {"type": "clock"}}}, f)
+        keys, *_ = load_board(self.path)
+        self.assertEqual({type(k).__name__ for k in keys}, {"Blank"})
 
     def test_example_layout(self):
         keys, brightness, providers, saver = load_board(os.path.join(HERE, "keys.example.json"))

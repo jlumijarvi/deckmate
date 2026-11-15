@@ -103,6 +103,7 @@ a plain button with a shell command, or a live key:
 | `mute` | mic or speaker, on or MUTED | toggles it (PipeWire, `wpctl`) |
 | `volume` | speaker volume | changes it by `step` percent |
 | `brightness` | the deck's brightness | steps it 30 / 60 / 100 (or the key's `steps` list), written to keys.json |
+| `media` (`action`: playpause, next or previous) | play/pause: the playing track with its cover and a play or pause glyph; next and previous: skip arrows | play/pause toggles, or launches Spotify when it is not running; the others skip |
 | `slack` | workspace name and a badge with the number of conversations that have unread messages, plus `@n` for mentions and DMs | opens that workspace in Slack |
 | `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a folder (a set of keys with a back key top left) |
 | `counter` (`state`: waiting, running or done) | how many sessions are in that state | shows only that state: bright border on the counter, empty slots and the pager name the filter, and it clears itself when no session is in that state any more; hold on the done counter hides every done session |
@@ -176,6 +177,16 @@ are the items, overdue first, then by due date, then undated; with more than
 `code`), `soon_days` (0 means only items due today count as "due soon"),
 `hold_done` (default true). Two to-do keys with different files give two lists.
 
+## Spotify
+
+The `media` keys talk to the Spotify app over MPRIS, the media-player
+interface on the session D-Bus that GNOME's own media controls use. Nothing
+is sent to Spotify's servers except the one fetch of the cover picture, which
+is cached per track. No Spotify login or API key is involved. `"player"` names
+another MPRIS player instead, for example `"chromium"`, since the interface is
+the same for all of them; the settings window calls the keys Spotify because
+that is the player they were made for.
+
 ## Slack
 
 The `slack` key takes `"team": "<workspace id>"`; without it the first workspace
@@ -214,6 +225,7 @@ is updated. Everything is read-only; nothing is sent anywhere.
 | sessions, counters, pagers | `~/.claude/sessions/<pid>.json` (one per running Claude Code process: title, folder, busy or idle) and the transcript `~/.claude/projects/<folder>/<session>.jsonl`, whose last entries decide waiting / done / failed | a Claude Code update that changes either file's layout; sessions then show as done or vanish |
 | stats page, stats key | `~/.config/Claude/plan-usage-history.json`, written by the Claude desktop app when it is running; tokens are summed from the transcripts above since local midnight | the desktop app is closed (numbers go stale, the tile shows when they were sampled) or changes the file |
 | slack | `root-state.json` under `~/snap/slack/`, `~/.config/Slack/` or the flatpak folder, which holds per-workspace unread totals (so a per-channel badge is not possible) | a Slack update that moves or restructures the file; the key shows "no data" |
+| media | the player's MPRIS properties on the session D-Bus (PlaybackStatus, Metadata), plus one https fetch per cover | the player is not running (the key says so) or drops MPRIS; Spotify leaves the artist empty for podcasts |
 | mute, volume | `wpctl` (PipeWire) | a system without PipeWire; the key shows "?" |
 | git dot | `git status` in the session's folder, every 30 seconds in a background thread | never fatal; no dot when git is missing |
 

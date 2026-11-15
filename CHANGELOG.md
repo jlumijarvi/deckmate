@@ -5,6 +5,9 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- New `media` key type for Spotify (or any MPRIS player): play/pause with the
+  track and its cover, next track, previous track. Over the session D-Bus, no
+  login.
 - Elgato's words where they have one: the text on a key is its "title" (the
   keys.json field `label` is migrated to `title` on first read), a to-do list
   opens as a "folder", keys are "pressed" rather than tapped, the backlight

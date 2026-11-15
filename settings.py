@@ -41,6 +41,9 @@ KEY_KINDS = [
     ("volume_up", "Volume up"),
     ("brightness", "Deck brightness"),
     ("slack", "Slack unread badge"),
+    ("media_playpause", "Spotify: play/pause"),
+    ("media_next", "Spotify: next track"),
+    ("media_previous", "Spotify: previous track"),
     ("todo", "To-do list"),
     ("session", "Claude: session slot"),
     ("counter_waiting", "Claude: waiting count"),
@@ -58,6 +61,9 @@ KIND_HINT = {
     "mute_source": "Toggles the microphone; the key shows its state",
     "mute_sink": "Toggles the speakers; the key shows its state",
     "slack": "Unread count and @mentions of one Slack workspace",
+    "media_playpause": "The playing track with its cover; press plays or pauses, or launches Spotify",
+    "media_next": "Skips to the next track",
+    "media_previous": "Goes back to the previous track",
     "todo": "Open items in a Markdown task list; press opens them as a folder",
     "session": "One running Claude Code session. Press opens its folder in VS Code, hold hides it",
     "counter_waiting": "Sessions asking you something. Press filters the slots to them",
@@ -107,6 +113,8 @@ def key_kind(cfg, i):
         return "counter_" + (k.get("state") or "waiting"), k
     if t == "pager":
         return "pager_" + (k.get("dir") or "next"), k
+    if t == "media":
+        return "media_" + (k.get("action") or "playpause"), k
     return "command", k
 
 
@@ -132,6 +140,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
         keys[str(i)] = {"type": "counter", "state": kind.split("_", 1)[1]}
     elif kind.startswith("pager_"):
         keys[str(i)] = {"type": "pager", "dir": kind.split("_", 1)[1]}
+    elif kind.startswith("media_"):
+        keys[str(i)] = {"type": "media", "action": kind.split("_", 1)[1]}
     elif kind == "mute_source":
         keys[str(i)] = {"type": "mute", "target": "source", "title": label or "Mic"}
     elif kind == "mute_sink":
@@ -166,6 +176,8 @@ def key_summary(cfg, i):
         return "< page"
     if kind == "pager_next":
         return "page >"
+    if kind.startswith("media_"):
+        return "Spotify\n" + {"playpause": "play/pause", "next": "next", "previous": "previous"}[kind[6:]]
     if kind == "empty":
         return ""
     return KIND_LABEL[kind]

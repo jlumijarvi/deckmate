@@ -5,6 +5,7 @@ import os
 
 from deckhid import KEY_COUNT
 from keys import Blank, Brightness, Clock, Command, Mute, Volume
+from mediakeys import Media
 from paths import CONFIG_DIR, read_layout
 from saver import ScreenSaver
 from sessionkeys import CounterKey, PagerKey, SessionBoard, SessionSlot
@@ -16,7 +17,7 @@ from todokeys import TodoKey
 log = logging.getLogger("deck")
 
 
-KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume, "slack": Slack}
+KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume, "slack": Slack, "media": Media}
 
 
 def load_board(path):
