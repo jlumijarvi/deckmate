@@ -63,6 +63,9 @@ lists) are refreshed once per tick before the keys render.
 Settings-window rule: the General page holds only board-wide settings;
 anything about one key lives in that key's dialog.
 
+Wording rule: the code and state.json say "dismissed"; everything the user
+sees (deck, settings hints, log, README) says "hidden".
+
 ## Tests and lint
 
 ```

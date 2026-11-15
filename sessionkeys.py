@@ -1,5 +1,8 @@
 """Keys for live Claude Code sessions: the shared SessionBoard, one slot per
-session, the counters, the pagers and the page of dismissed sessions."""
+session, the counters, the pagers and the page of dismissed sessions.
+
+"Dismissed" in the code is "hidden" everywhere the user sees it (deck, settings,
+log, README): the session is off the board and can be brought back."""
 import logging
 import shlex
 import time
@@ -189,7 +192,7 @@ class SessionSlot(Key):
         s = self.session
         self.dismissed_ok = self.board.view.dismiss(s)
         if self.dismissed_ok:
-            log.info(f"dismissed: {s.name} ({s.state})")
+            log.info(f"hidden: {s.name} ({s.state})")
             nav.dirty = True
 
     def render_held(self):
@@ -288,7 +291,7 @@ class DismissedSessionKey(Key):
 
     def tap(self):
         self.board.view.restore(self.s.session_id)
-        log.info(f"restored: {self.s.name}")
+        log.info(f"unhidden: {self.s.name}")
         nav.dirty = True
 
 

@@ -5,6 +5,8 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- One word for a session taken off the board: "hidden" on the deck, in the
+  settings hints and in the log (the hints and log said "dismissed").
 - The prev pager key only turns pages; the stats page is opened by the `stats`
   key alone. (Before, a tap on the first page opened the stats page.)
 - CI: the release job checks out the repository before downloading the built
