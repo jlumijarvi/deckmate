@@ -160,7 +160,6 @@ def analyze_tail(lines):
         return result
 
     # tool calls in this turn without a result yet
-    last_id = msg.get("id")
     pending = {}
     for e in turn:
         m = e.get("message", {})

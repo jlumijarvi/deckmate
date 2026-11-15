@@ -31,7 +31,6 @@ Usage:
     python3 deck.py --saver --preview saver.png   # start in screen-saver mode
 """
 import argparse
-import argparse
 import json
 import logging
 import logging.handlers
@@ -335,7 +334,7 @@ def main():
                             presses.reset()
                             next_refresh = time.monotonic() + REFRESH_S
                         continue
-                    for i, (was, is_now) in enumerate(zip(pressed, states)):
+                    for i, (was, is_now) in enumerate(zip(pressed, states, strict=True)):
                         if was == is_now:
                             continue
                         pressed[i] = is_now

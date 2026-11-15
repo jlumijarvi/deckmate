@@ -109,7 +109,7 @@ def main():
             states = deck.read_keys(0.2)
             if states is None:
                 continue
-            for k, (was, now) in enumerate(zip(pressed, states)):
+            for k, (was, now) in enumerate(zip(pressed, states, strict=True)):
                 if was != now:
                     print(f"  key {k:2d} {'pressed ' if now else 'released'}  (row {k // COLS}, col {k % COLS})")
                     deck.set_key_image(k, render_key(k, now))
