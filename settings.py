@@ -38,6 +38,7 @@ KEY_KINDS = [
     ("mute_sink", "Speaker mute"),
     ("volume_down", "Volume down"),
     ("volume_up", "Volume up"),
+    ("brightness", "Deck brightness"),
     ("slack", "Slack unread badge"),
     ("todo", "To-do list"),
     ("session", "Claude: session slot"),
@@ -62,7 +63,8 @@ KIND_HINT = {
     "counter_running": "Sessions still working. Tap filters the slots to them",
     "counter_done": "Finished sessions. Tap filters, hold hides them all",
     "pager_prev": "Previous page of sessions. Hold: hidden sessions",
-    "pager_next": "Next page of sessions. Hold: cycle brightness 30 / 60 / 100",
+    "pager_next": "Next page of sessions",
+    "brightness": "Shows the deck's brightness; tap steps it 30 / 60 / 100",
     "stats": "Opens the stats page: plan quota, tokens today, cache reads, fullest context",
 }
 
@@ -103,7 +105,7 @@ def key_kind(cfg, i):
         return ("mute_source" if k.get("target") == "source" else "mute_sink"), k
     if t == "volume":
         return ("volume_up" if int(k.get("step", 5)) > 0 else "volume_down"), k
-    if t in ("clock", "slack", "todo", "stats"):
+    if t in ("clock", "slack", "todo", "stats", "brightness"):
         return t, k
     if t == "counter":
         return "counter_" + (k.get("state") or "waiting"), k
@@ -128,6 +130,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
         keys[str(i)] = {"type": "todo", **(todo or {})}
     elif kind == "stats":
         keys[str(i)] = {"type": "stats"}
+    elif kind == "brightness":
+        keys[str(i)] = {"type": "brightness"}
     elif kind.startswith("counter_"):
         keys[str(i)] = {"type": "counter", "state": kind.split("_", 1)[1]}
     elif kind.startswith("pager_"):
@@ -160,6 +164,8 @@ def key_summary(cfg, i):
         return "Count\n" + kind.split("_", 1)[1]
     if kind == "stats":
         return "Stats"
+    if kind == "brightness":
+        return "Bright-\nness"
     if kind == "pager_prev":
         return "< page"
     if kind == "pager_next":

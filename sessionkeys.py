@@ -250,14 +250,13 @@ class CounterKey(Key):
 
 
 class PagerKey(Key):
-    """prev: previous session page; hold shows the dismissed sessions.
-    next: next page; hold cycles brightness 30 / 60 / 100."""
+    """prev: previous session page; hold shows the dismissed sessions. next: next page."""
     dynamic = True
-    holdable = True
 
-    def __init__(self, board, direction, on_brightness=None):
+    def __init__(self, board, direction):
         super().__init__({})
-        self.board, self.direction, self.on_brightness = board, direction, on_brightness
+        self.board, self.direction = board, direction
+        self.holdable = direction == "prev"
 
     def render(self, pressed):
         v = self.board.view
@@ -279,11 +278,7 @@ class PagerKey(Key):
         nav.dirty = True
 
     def hold(self):
-        if self.direction == "prev":
-            nav.push(DismissedPage(self.board))
-        elif self.on_brightness:
-            self.on_brightness()
-        nav.dirty = True
+        nav.push(DismissedPage(self.board))
 
     def render_held(self):
         return self.render(True)

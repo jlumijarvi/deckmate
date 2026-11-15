@@ -6,6 +6,7 @@ Key types (see keys.json):
   clock               shows time and date, updates every second
   mute                target "source" (mic) or "sink" (speaker); shows state, tap toggles
   volume              step (+/- percent); shows the speaker volume, tap changes it
+  brightness          shows the deck's brightness; tap steps it 30 / 60 / 100 ("steps")
   slack               unread badge for one workspace ("team": id, default: the first
                       workspace found); tap opens that workspace in Slack
   todo                open items in a to-do list (a Markdown task list, see todo.py),

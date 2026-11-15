@@ -25,6 +25,7 @@ def every_type(todo_file):
             "2": {"type": "mute", "target": "source", "label": "Mic"},
             "3": {"type": "volume", "step": -5},
             "4": {"type": "slack"},
+            "8": {"type": "brightness", "steps": [20, 80]},
             "9": {"type": "todo", "file": todo_file, "soon_days": 2},
             "10": {"type": "counter", "state": "waiting"},
             "11": {"type": "counter", "state": "done"},
@@ -34,7 +35,7 @@ def every_type(todo_file):
             "99": {"type": "command"},
             "7": {"type": "nonsense"},
         },
-        "sessions": {"keys": [5, 6, 7, 8]},
+        "sessions": {"keys": [5, 6, 7]},
         "screensaver": {"image": "clock", "timeout_min": 5},
     }
 
@@ -63,7 +64,7 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(len(keys), KEY_COUNT)
         self.assertEqual(brightness, 60)
         self.assertTrue(saver.enabled and saver.is_tiles)
-        self.assertEqual([type(k).__name__ for k in keys[5:9]], ["SessionSlot"] * 4)
+        self.assertEqual([type(k).__name__ for k in keys[5:9]], ["SessionSlot"] * 3 + ["Brightness"])
         self.assertIsInstance(keys[9], TodoKey)
         self.assertEqual(keys[9].todo.soon_days, 2)
         keys[9].todo.refresh()
@@ -88,13 +89,20 @@ class LayoutTest(unittest.TestCase):
         self.assertIsInstance(keys[13], PagerKey)
         self.render_all(keys)
 
-    def test_brightness_cycle_writes_to_the_layout_not_the_todo_file(self):
+    def test_brightness_key_writes_to_the_layout_not_the_todo_file(self):
         keys, *_ = load_board(self.path)
+        self.assertEqual(keys[8].level, 60)
+        self.assertFalse(keys[14].holdable)    # the next pager has no hold any more
         with open(self.todo) as f:
             todo_before = f.read()
-        keys[14].hold()    # next pager: cycle brightness 60 -> 100
+        keys[8].tap()    # 60 -> 80 with the key's own steps
         with open(self.path) as f:
-            self.assertEqual(json.load(f)["brightness"], 100)
+            self.assertEqual(json.load(f)["brightness"], 80)
+        keys, *_ = load_board(self.path)
+        self.assertEqual(keys[8].level, 80)
+        keys[8].tap()    # 80 -> wraps to 20
+        with open(self.path) as f:
+            self.assertEqual(json.load(f)["brightness"], 20)
         with open(self.todo) as f:
             self.assertEqual(f.read(), todo_before)
 

@@ -5,6 +5,8 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- New `brightness` key type: shows the level, tap steps it 30 / 60 / 100 (or
+  the key's own `steps`). The next pager's hold no longer cycles brightness.
 - A counter filter now shows on the board: empty slots say "waiting only" (or
   running, done), the pager label names the state, a counter at zero cannot
   filter, and the filter clears itself when its state empties.

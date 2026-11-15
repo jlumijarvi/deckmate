@@ -1,4 +1,7 @@
 """The key base class and the plain key types: blank, command, clock, mute, volume."""
+import json
+import logging
+import os
 from datetime import datetime
 
 from PIL import Image
@@ -11,6 +14,9 @@ REFRESH_S = 1.0      # data refresh and static repaint
 FRAME_S = 0.05       # repaint interval while something animates
 SCROLL_PX_S = 30.0   # scrolling title speed
 HOLD_S = 0.6         # a press this long is a hold, for keys that have a hold action
+BRIGHTNESS_STEPS = (30, 60, 100)
+
+log = logging.getLogger("deck")
 
 
 class Key:
@@ -105,3 +111,45 @@ class Volume(Key):
         step = int(self.cfg.get("step", 5))
         sign = "+" if step > 0 else "-"
         sh(f"wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ {abs(step)}%{sign}")
+
+
+def cycle_brightness(config_file, steps=BRIGHTNESS_STEPS):
+    """30 -> 60 -> 100 -> 30, written to the layout file, which the running board
+    reloads (and so re-creates every key, including the brightness key's label)."""
+    try:
+        with open(config_file) as f:
+            cfg = json.load(f)
+        cur = int(cfg.get("brightness", 60))
+        nxt = next((b for b in steps if b > cur), steps[0])
+        cfg["brightness"] = nxt
+        tmp = config_file + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(cfg, f, indent=2)
+            f.write("\n")
+        os.replace(tmp, config_file)
+        log.info(f"brightness {cur} -> {nxt}")
+    except (OSError, ValueError) as e:
+        log.info(f"brightness change failed: {e}")
+
+
+class Brightness(Key):
+    """Shows the deck's brightness; tap steps it 30 / 60 / 100 (or the key's "steps")."""
+
+    def __init__(self, cfg, level, config_file):
+        super().__init__(cfg)
+        self.level, self.config_file = level, config_file
+        steps = cfg.get("steps")
+        self.steps = tuple(sorted(int(x) for x in steps)) if steps else BRIGHTNESS_STEPS
+
+    def render(self, pressed):
+        img, d, fg = tile((60, 56, 40), pressed)
+        draw_centered_lines(d, [self.cfg.get("label") or "Bright"], fg, size=12, top=9)
+        draw_centered_lines(d, [f"{self.level}%"], fg, size=24, top=26)
+        if not pressed:
+            # a bar of the current level along the bottom
+            d.rectangle([0, KEY_PX - 3, KEY_PX, KEY_PX], fill=(30, 30, 30))
+            d.rectangle([0, KEY_PX - 3, int(KEY_PX * self.level / 100), KEY_PX], fill=(240, 200, 90))
+        return img
+
+    def tap(self):
+        cycle_brightness(self.config_file, self.steps)

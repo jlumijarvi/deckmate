@@ -5,7 +5,7 @@ import logging
 import os
 
 from deckhid import KEY_COUNT
-from keys import Blank, Clock, Command, Mute, Volume
+from keys import Blank, Brightness, Clock, Command, Mute, Volume
 from paths import CONFIG_DIR
 from saver import ScreenSaver
 from sessionkeys import CounterKey, PagerKey, SessionBoard, SessionSlot
@@ -20,28 +20,6 @@ log = logging.getLogger("deck")
 KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume, "slack": Slack}
 
 
-BRIGHTNESS_STEPS = (30, 60, 100)
-
-
-def cycle_brightness(config_file):
-    """Hold on the next-page key: 30 -> 60 -> 100 -> 30, written to the layout file,
-    which the running board reloads."""
-    try:
-        with open(config_file) as f:
-            cfg = json.load(f)
-        cur = int(cfg.get("brightness", 60))
-        nxt = next((b for b in BRIGHTNESS_STEPS if b > cur), BRIGHTNESS_STEPS[0])
-        cfg["brightness"] = nxt
-        tmp = config_file + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(cfg, f, indent=2)
-            f.write("\n")
-        os.replace(tmp, config_file)
-        log.info(f"brightness {cur} -> {nxt}")
-    except (OSError, ValueError) as e:
-        log.info(f"brightness change failed: {e}")
-
-
 def load_board(path):
     with open(path) as f:
         cfg = json.load(f)
@@ -54,6 +32,9 @@ def load_board(path):
         ktype = kcfg.get("type", "command")
         if ktype in ("todo", "counter", "pager", "stats"):
             keys[i] = (ktype, kcfg)  # resolved below, once the shared objects exist
+            continue
+        if ktype == "brightness":
+            keys[i] = Brightness(kcfg, int(cfg.get("brightness", 60)), path)
             continue
         if ktype not in KEY_TYPES:
             log.info(f"keys.json: key {idx} has unknown type {ktype!r}")
@@ -71,7 +52,7 @@ def load_board(path):
         if isinstance(k, tuple) and k[0] == "counter":
             keys[i] = CounterKey(board, k[1].get("state", "waiting"))
         elif isinstance(k, tuple) and k[0] == "pager":
-            keys[i] = PagerKey(board, k[1].get("dir", "next"), on_brightness=lambda: cycle_brightness(path))
+            keys[i] = PagerKey(board, k[1].get("dir", "next"))
         elif isinstance(k, tuple) and k[0] == "stats":
             keys[i] = StatsKey(k[1], board)
     if board is not None:
