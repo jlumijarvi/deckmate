@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.7.0 (2026-11-15)
 
 - The board is split into modules: `render.py` (drawing helpers), `keys.py`
   (plain key types), `pages.py` (sub-decks), `sessionkeys.py`, `statskeys.py`,
