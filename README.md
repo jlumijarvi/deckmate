@@ -234,3 +234,7 @@ command, which is not published for this model, so the board leaves it alone.
 The four "background" slots the deck reports are a separate, unused image
 memory on this model: "Show Background by Index" changes nothing on it.
 
+
+## Licence
+
+MIT, see [LICENSE](LICENSE).
