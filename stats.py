@@ -23,6 +23,7 @@ PLAN_USAGE = os.path.expanduser("~/.config/Claude/plan-usage-history.json")
 PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
 STALE_S = 2 * 3600     # older data is shown greyed; its age is shown from AGE_SHOWN_S on
 AGE_SHOWN_S = 10 * 60
+RESET_JITTER_S = 120   # sources report the same window end a second or so apart
 
 
 @dataclass
@@ -186,12 +187,12 @@ class Usage:
         now = self.clock()
         for name, lim in merged.items():
             end = self._window_end.get(name)
-            if lim.resets_at and (end is None or lim.resets_at > end):
+            if lim.resets_at and (end is None or lim.resets_at > end + RESET_JITTER_S):
                 if end is not None and self._started and not self.new_window.get(name):
                     self.reset_events.append(name)      # a new window, seen in the data first
                 self._window_end[name] = end = lim.resets_at
                 self.new_window[name] = False
-            if end and now >= end and not self.new_window.get(name) and (lim.at or 0) < end:
+            if end and now >= end and not self.new_window.get(name) and (lim.at or 0) < end - RESET_JITTER_S:
                 self.new_window[name] = True             # the clock passed the end of the window
                 if self._started:
                     self.reset_events.append(name)

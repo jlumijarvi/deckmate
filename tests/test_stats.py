@@ -137,6 +137,16 @@ class UsageTest(unittest.TestCase):
         self.assertEqual(u.reset_events, ["session"])
         self.assertFalse(u.new_window["session"])
 
+    def test_same_window_reported_a_second_apart_is_not_a_reset(self):
+        self.write(self.cache_path, cache(session_reset=T0 + 3600.166, week_reset=T0 + 5 * 86400 + 0.2))
+        u = self.usage()
+        u.refresh()
+        self.now = T0 + 5
+        self.write(self.cache_path, cache(at=T0 + 4, session_reset=T0 + 3599.8, week_reset=T0 + 5 * 86400 + 1.1))
+        u.refresh()
+        self.assertEqual(u.reset_events, [])
+        self.assertFalse(any(u.new_window.values()))
+
     def test_stale_and_age(self):
         self.write(self.cache_path, cache(at=T0 - 3 * 3600))
         u = self.usage()

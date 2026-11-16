@@ -3,6 +3,11 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Stats: no false "new window" pulse when two sources report the same reset
+  time a second apart.
+
 ## 0.9.3 (2026-11-16)
 
 - Stats: the limits come live from Anthropic's usage API, the call Claude
