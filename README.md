@@ -1,5 +1,8 @@
 # Deckmate
 
+[![CI](https://github.com/jlumijarvi/deckmate/actions/workflows/ci.yml/badge.svg)](https://github.com/jlumijarvi/deckmate/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjlumijarvi%2Fdeckmate%2Fbadges%2Fcoverage.json)](https://github.com/jlumijarvi/deckmate/actions/workflows/ci.yml)
+
 A small Python program that drives an Elgato Stream Deck (Original V2 or MK.2,
 15 keys) on Ubuntu, with no Elgato software and no libraries beyond Pillow.
 It talks the deck's stock USB HID protocol through `/dev/hidraw*`. Besides

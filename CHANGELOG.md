@@ -5,6 +5,8 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- CI measures test coverage and the README shows it as a badge, next to the
+  build status.
 - README: the update check no longer needs `gh`; the repository is public.
 
 ## 0.9.4 (2026-11-16)

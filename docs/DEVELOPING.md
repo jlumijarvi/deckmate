@@ -104,8 +104,11 @@ all accounts), the tray autostart entry, the icons, the polkit action and the
 update helper. The staged modules must import before the package is built.
 
 The GitHub Actions workflow in `.github/workflows/ci.yml` runs ruff, the unit
-tests, the import check, builds the `.deb` and installs it on the runner on
-every push. On a `v*` tag it also checks that the tag matches `VERSION` and
+tests under coverage, the import check, builds the `.deb` and installs it on
+the runner on every push. On main it also writes the coverage percentage as a
+shields.io endpoint file to the `badges` branch, which the README's coverage
+badge reads; `pipx run coverage run -m unittest discover -s tests` followed by
+`pipx run coverage report` gives the same number locally. On a `v*` tag it also checks that the tag matches `VERSION` and
 that `CHANGELOG.md` has a section for it, then publishes the GitHub release
 with the package attached and the changelog section as the notes. That release
 is what the tray icons on installed machines look for.

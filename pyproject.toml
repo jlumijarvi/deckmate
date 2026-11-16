@@ -16,3 +16,10 @@ ignore = [
 "tests/*" = ["E402"]   # sys.path is set up before the imports
 "settings.py" = ["E402"]
 "tray.py" = ["E402"]
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "hello_deck.py"]
+
+[tool.coverage.report]
+skip_empty = true
