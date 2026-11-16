@@ -25,6 +25,7 @@ GLib.set_prgname(APP_ID)
 
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, KEY_COUNT  # noqa: E402
 from slackstate import SlackState  # noqa: E402
+from vpnkey import vpn_connections  # noqa: E402
 
 from paths import (HERE, CONFIG, EXAMPLE, PID_FILE, TRAY_PID_FILE,  # noqa: E402
                    config_path, read_layout, version, write_layout)
@@ -40,6 +41,7 @@ KEY_KINDS = [
     ("volume_down", "Volume down"),
     ("volume_up", "Volume up"),
     ("brightness", "Deck brightness"),
+    ("vpn", "VPN on/off"),
     ("slack", "Slack unread badge"),
     ("media_playpause", "Spotify: play/pause"),
     ("media_next", "Spotify: next track"),
@@ -72,6 +74,7 @@ KIND_HINT = {
     "pager_prev": "Previous page of sessions. Hold: hidden sessions",
     "pager_next": "Next page of sessions",
     "brightness": "Shows the deck's brightness; press steps it 30 / 60 / 100",
+    "vpn": "A NetworkManager VPN connection: shows on or off, press switches it",
     "stats": "What is left of the session, week and model limits; press opens the stats page",
 }
 
@@ -107,7 +110,7 @@ def key_kind(cfg, i):
         return ("mute_source" if k.get("target") == "source" else "mute_sink"), k
     if t == "volume":
         return ("volume_up" if int(k.get("step", 5)) > 0 else "volume_down"), k
-    if t in ("clock", "slack", "todo", "stats", "brightness"):
+    if t in ("clock", "slack", "todo", "stats", "brightness", "vpn"):
         return t, k
     if t == "counter":
         return "counter_" + (k.get("state") or "waiting"), k
@@ -118,7 +121,7 @@ def key_kind(cfg, i):
     return "command", k
 
 
-def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None, tiles=None):
+def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None, tiles=None, connection=None):
     keys = cfg.setdefault("keys", {})
     sess = [s for s in session_keys(cfg) if s != i]
     keys.pop(str(i), None)
@@ -136,6 +139,9 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
         keys[str(i)] = {"type": "stats", **({"tiles": list(tiles)} if tiles else {})}
     elif kind == "brightness":
         keys[str(i)] = {"type": "brightness"}
+    elif kind == "vpn":
+        keys[str(i)] = {"type": "vpn", **({"connection": connection} if connection else {}),
+                        **({"title": label} if label.strip() else {})}
     elif kind.startswith("counter_"):
         keys[str(i)] = {"type": "counter", "state": kind.split("_", 1)[1]}
     elif kind.startswith("pager_"):
@@ -172,6 +178,8 @@ def key_summary(cfg, i):
         return "Stats"
     if kind == "brightness":
         return "Bright-\nness"
+    if kind == "vpn":
+        return "VPN\n" + (k.get("connection") or "")
     if kind == "pager_prev":
         return "< page"
     if kind == "pager_next":
@@ -353,6 +361,13 @@ class KeyDialog(Adw.Dialog):
         self.team_row.set_selected(ids.index(k["team"]) if k.get("team") in ids else 0)
         group.add(self.team_row)
 
+        self.vpn_names = vpn_connections()
+        self.vpn_row = Adw.ComboRow(title="Connection")
+        self.vpn_row.set_model(Gtk.StringList.new(self.vpn_names or ["no VPN connections in NetworkManager"]))
+        self.vpn_row.set_selected(self.vpn_names.index(k["connection"])
+                                  if k.get("connection") in self.vpn_names else 0)
+        group.add(self.vpn_row)
+
         # to-do list rows
         self.todo_file = Adw.ActionRow(title="List file")
         self.todo_file.set_subtitle(k.get("file") or "~/.config/deckmate/todo.md")
@@ -407,10 +422,11 @@ class KeyDialog(Adw.Dialog):
         kind = self.kind()
         self.hint.set_text(KIND_HINT.get(kind, ""))
         self.hint.set_visible(kind in KIND_HINT)
-        self.label_row.set_visible(kind in ("command", "mute_source", "mute_sink", "todo"))
+        self.label_row.set_visible(kind in ("command", "mute_source", "mute_sink", "todo", "vpn"))
         self.color_row.set_visible(kind == "command")
         self.run_row.set_visible(kind == "command")
         self.team_row.set_visible(kind == "slack")
+        self.vpn_row.set_visible(kind == "vpn")
         for row in (self.todo_file, self.todo_open, self.todo_soon, self.todo_hold):
             row.set_visible(kind == "todo")
         for row in self.stats_tiles.values():
@@ -429,8 +445,9 @@ class KeyDialog(Adw.Dialog):
             **({"title": label} if label.strip() else {}),
         }
         tiles = [name for name, row in self.stats_tiles.items() if row.get_active()]
-        set_key(self.window.cfg, self.index, self.kind(),
-                label=label, color=color, run=self.run_row.get_text(), team=team, todo=todo, tiles=tiles)
+        connection = self.vpn_names[self.vpn_row.get_selected()] if self.vpn_names else None
+        set_key(self.window.cfg, self.index, self.kind(), label=label, color=color, run=self.run_row.get_text(),
+                team=team, todo=todo, tiles=tiles, connection=connection)
         self.window.save()
         self.window.refresh_grid()
         self.close()

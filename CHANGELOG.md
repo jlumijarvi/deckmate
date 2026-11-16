@@ -5,6 +5,8 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- New `vpn` key type: a NetworkManager VPN connection, on or off at a glance,
+  press switches it (#10).
 - Stats: the limits come from Claude Code's own cache (`~/.claude.json`),
   with the desktop app's file as the fallback when it is newer; the key shows
   session, week and the model-scoped weekly limit as three bars, the page one
