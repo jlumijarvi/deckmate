@@ -3,8 +3,10 @@
 A small Python program that drives an Elgato Stream Deck (Original V2 or MK.2,
 15 keys) on Ubuntu, with no Elgato software and no libraries beyond Pillow.
 It talks the deck's stock USB HID protocol through `/dev/hidraw*`. Besides
-plain buttons, a clock and audio keys it shows one key per running Claude
-Code session, a to-do list, a Slack unread badge and a screen saver.
+plain buttons, folders, a clock and audio keys it shows one key per running
+Claude Code session with its state and your plan limits, a to-do list, a
+Spotify key with the cover, a Slack unread badge, a VPN switch and a screen
+saver. A settings window and a top-bar icon come with it.
 
 Until 0.6 the project was called stream-deck; the package replaces the old
 one and copies your settings over on first start.
@@ -44,9 +46,7 @@ installs it on its own (switch "Install updates automatically" in the
 settings; off means it only offers the update in its menu). The install runs
 the root helper `/usr/lib/deckmate/install-update` through pkexec; the polkit
 action shipped with the package lets a logged-in user do that without a
-password, and the helper accepts nothing but a package named deckmate. While
-the repository is private, the check goes through the `gh` tool, so run
-`gh auth login` once in each account.
+password, and the helper accepts nothing but a package named deckmate.
 
 ## The board service
 
