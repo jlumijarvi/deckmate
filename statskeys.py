@@ -2,7 +2,7 @@
 limits, with optional tiles for tokens today, cache reads and the fullest context."""
 from deckhid import KEY_COUNT, KEY_PX
 from keys import Blank, Key
-from pages import NavKey, nav
+from pages import back_key, nav
 from render import CYAN, MARK_W, code_mark, dim, draw_centered_lines, fit_lines, font, tile
 from stats import StatsProvider, age_text, fmt_tokens
 
@@ -97,7 +97,7 @@ class StatsPage:
         st = stats_provider()
         usage = st.usage
         keys = [Blank({}) for _ in range(KEY_COUNT)]
-        keys[0] = NavKey("<", "back", nav.pop)
+        keys[0] = back_key()
         n = 1
         for name in LIMIT_ORDER:
             lim = usage.limits.get(name)

@@ -99,6 +99,7 @@ a plain button with a shell command, or a live key:
 | Type | Shows | Press |
 | --- | --- | --- |
 | (none) | its title | runs `run` in a shell, detached |
+| `folder` | its title, with a small folder tab | opens the folder: its own `keys` map, key 0 is the back key (press: one level up, hold: the main board) |
 | `clock` | time and date | nothing |
 | `mute` | mic or speaker, on or MUTED | toggles it (PipeWire, `wpctl`) |
 | `volume` | speaker volume | changes it by `step` percent |
@@ -114,6 +115,22 @@ a plain button with a shell command, or a live key:
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
 sessions fill them. Titles that do not fit wrap and shrink
 automatically.
+
+## Folders
+
+A `folder` key opens a set of keys of its own, like Elgato's folders: key 0
+inside goes back (hold it to return to the main board from any depth), the
+other fourteen are any key types except session slots, folders included.
+In keys.json a folder carries its own `keys` map:
+
+```json
+"3": {"type": "folder", "title": "Work", "color": "#2d5a7a",
+      "keys": {"1": {"title": "Jira", "run": "xdg-open https://jira.example.com"},
+               "2": {"type": "vpn", "connection": "Office"}}}
+```
+
+In the settings window, save a key as a folder, then open it: the key grid
+shows the folder's keys with a "Back to parent" button above it.
 
 ## Claude Code sessions
 

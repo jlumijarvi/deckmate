@@ -26,10 +26,11 @@ logs to stdout and to `~/.local/state/deckmate/deck.log`.
 | --- | --- |
 | `deckhid.py` | the driver: find the deck, set brightness, paint keys, read presses |
 | `deck.py` | the main loop: connect, paint, presses and holds, screen saver, seat changes |
-| `layout.py` | builds the board from keys.json: one key object per position plus the shared providers |
+| `layout.py` | builds the board from keys.json: one key object per position plus the shared providers; folders call the same builder for their own map |
 | `keys.py` | the `Key` base class and the plain types: blank, command, clock, mute, volume |
 | `render.py` | drawing helpers: fonts, colours, label wrapping, the `>_` corner mark, preview image |
-| `pages.py` | sub-decks: the navigator stack and the back / page keys |
+| `pages.py` | folders and pages: the navigator stack and the back / page keys |
+| `folderkeys.py` | the folder key and its page |
 | `sessionkeys.py` | Claude Code session slots, counters, pagers, the hidden-sessions page |
 | `statskeys.py` | the stats page and the stats key |
 | `slackkey.py`, `todokeys.py` | the Slack key; the to-do key, its sub-deck and item keys |

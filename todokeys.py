@@ -5,7 +5,7 @@ import shlex
 
 from deckhid import KEY_COUNT, KEY_PX
 from keys import Blank, Key
-from pages import NavKey, nav
+from pages import NavKey, back_key, nav
 from render import dim, draw_centered_lines, fit_lines, font, tile
 from system import launch
 from todo import due_text
@@ -137,7 +137,7 @@ class TodoPage:
         self.index = min(self.index, pages - 1)
         shown = items[self.index * per:(self.index + 1) * per]
         keys = [Blank({}) for _ in range(KEY_COUNT)]
-        keys[0] = NavKey("<", "back", nav.pop)
+        keys[0] = back_key()
         for n, item in enumerate(shown, start=1):
             keys[n] = TodoItemKey(item, self.todo, self.cfg)
         if paged:

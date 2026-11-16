@@ -13,7 +13,7 @@ from board import SessionView, StateStore, breath, detect_pulses, scroll_offset
 from deckhid import KEY_COUNT, KEY_PX
 from gitinfo import GitWatcher, dot_kind
 from keys import REFRESH_S, SCROLL_PX_S, Blank, Key
-from pages import NavKey, nav
+from pages import NavKey, back_key, nav
 from paths import STATE_FILE
 from render import MARK_W, STATE_COLORS, code_mark, dim, draw_centered_lines, fit_lines, font, tile
 from sessions import Session, SessionScanner, elapsed_text
@@ -321,7 +321,7 @@ class DismissedPage:
 
     def keys(self):
         keys = [Blank({}) for _ in range(KEY_COUNT)]
-        keys[0] = NavKey("<", "back", nav.pop)
+        keys[0] = back_key()
         hidden = self.board.view.dismissed_sessions()
         if not hidden:
             keys[2] = Blank({})

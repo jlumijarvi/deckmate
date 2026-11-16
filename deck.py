@@ -3,6 +3,7 @@
 
 Key types (see keys.json):
   command  (default)  title, color, run       press runs the shell command
+  folder              title, color, "keys": {...}  press opens the folder: its own keys, 0 is back
   clock               shows time and date, updates every second
   mute                target "source" (mic) or "sink" (speaker); shows state, press toggles
   volume              step (+/- percent); shows the speaker volume, press changes it

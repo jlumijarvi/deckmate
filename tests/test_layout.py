@@ -97,6 +97,34 @@ class LayoutTest(unittest.TestCase):
         self.assertNotIn("label", text)
         self.assertIn('"title": "Tasks"', text)
 
+    def test_folder_builds_its_own_keys_with_a_back_key(self):
+        with open(self.path, "w") as f:
+            json.dump({"keys": {"3": {"type": "folder", "title": "Work", "keys": {
+                "0": {"type": "clock"},                                   # ignored: 0 is the back key
+                "1": {"title": "Jira", "run": "true"},
+                "2": {"type": "folder", "title": "Deeper", "keys": {"1": {"type": "clock"}}},
+                "4": {"type": "counter", "state": "done"},
+                "5": {"type": "todo", "file": self.todo},
+            }}}}, f)
+        keys, brightness, providers, saver = load_board(self.path)
+        folder = keys[3]
+        self.assertEqual(type(folder).__name__, "Folder")
+        self.render_all([folder])
+        nav.reset(keys)
+        folder.press()
+        inside = nav.keys()
+        self.assertEqual(len(inside), KEY_COUNT)
+        self.assertEqual(type(inside[0]).__name__, "NavKey")
+        self.assertTrue(inside[0].holdable)
+        self.assertEqual([type(k).__name__ for k in inside[1:6]],
+                         ["Command", "Folder", "Blank", "CounterKey", "TodoKey"])
+        self.render_all(inside)
+        inside[2].press()                                              # nested folder
+        self.assertEqual(len(nav.stack), 2)
+        nav.keys()[0].hold()                                           # hold back: home from any depth
+        self.assertEqual(nav.stack, [])
+        self.assertTrue(any(type(p).__name__ == "SessionBoard" for p in providers))   # the counter needed it
+
     def test_sample_list_only_for_the_default_file(self):
         other = os.path.join(self.tmp.name, "work.md")
         with open(self.path, "w") as f:

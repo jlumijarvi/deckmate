@@ -35,6 +35,7 @@ DECK_PY = os.path.join(HERE, "deck.py")
 KEY_KINDS = [
     ("empty", "Empty"),
     ("command", "Button"),
+    ("folder", "Folder"),
     ("clock", "Clock"),
     ("mute_source", "Mic mute"),
     ("mute_sink", "Speaker mute"),
@@ -60,6 +61,8 @@ KIND_LABEL = dict(KEY_KINDS)
 # shown under the type row; the short labels above must fit the dropdown
 KIND_HINT = {
     "command": "Runs a shell command when pressed",
+    "folder": "Opens a set of keys of its own; key 0 inside goes back, hold it for the main board. "
+              "Save, then open the folder to fill it",
     "mute_source": "Toggles the microphone; the key shows its state",
     "mute_sink": "Toggles the speakers; the key shows its state",
     "slack": "Unread count and @mentions of one Slack workspace",
@@ -110,7 +113,7 @@ def key_kind(cfg, i):
         return ("mute_source" if k.get("target") == "source" else "mute_sink"), k
     if t == "volume":
         return ("volume_up" if int(k.get("step", 5)) > 0 else "volume_down"), k
-    if t in ("clock", "slack", "todo", "stats", "brightness", "vpn"):
+    if t in ("clock", "slack", "todo", "stats", "brightness", "vpn", "folder"):
         return t, k
     if t == "counter":
         return "counter_" + (k.get("state") or "waiting"), k
@@ -124,11 +127,14 @@ def key_kind(cfg, i):
 def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None, tiles=None, connection=None):
     keys = cfg.setdefault("keys", {})
     sess = [s for s in session_keys(cfg) if s != i]
-    keys.pop(str(i), None)
+    old = keys.pop(str(i), None) or {}
     if kind == "session":
         sess.append(i)
     elif kind == "command":
         keys[str(i)] = {"title": label, "color": color, "run": run}
+    elif kind == "folder":   # keep the folder's own keys across a re-save
+        inside = old.get("keys") if old.get("type") == "folder" else {}
+        keys[str(i)] = {"type": "folder", "title": label, "color": color, "keys": inside or {}}
     elif kind == "clock":
         keys[str(i)] = {"type": "clock"}
     elif kind == "slack":
@@ -156,7 +162,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
         keys[str(i)] = {"type": "volume", "step": -5}
     elif kind == "volume_up":
         keys[str(i)] = {"type": "volume", "step": 5}
-    cfg.setdefault("sessions", {})["keys"] = sorted(sess)
+    if sess or "sessions" in cfg:   # a folder has no session slots: do not give it a "sessions" entry
+        cfg.setdefault("sessions", {})["keys"] = sorted(sess)
     cfg["keys"] = {k: keys[k] for k in sorted(keys, key=int)}
 
 
@@ -164,6 +171,8 @@ def key_summary(cfg, i):
     kind, k = key_kind(cfg, i)
     if kind == "command":
         return k.get("title", "").replace("\n", " ") or "(no title)"
+    if kind == "folder":
+        return "Folder\n" + (k.get("title") or "")
     if kind in ("mute_source", "mute_sink"):
         return k.get("title") or KIND_LABEL[kind]
     if kind == "session":
@@ -319,16 +328,28 @@ class KeyDialog(Adw.Dialog):
         self.set_title(f"Key {index}  (row {index // COLS + 1}, column {index % COLS + 1})")
         self.set_content_width(440)
 
-        kind, k = key_kind(window.cfg, index)
+        self.cfg = window.level_cfg()
+        kind, k = key_kind(self.cfg, index)
+        self.is_folder = k.get("type") == "folder"
         page = Adw.PreferencesPage()
         group = Adw.PreferencesGroup()
         page.add(group)
 
+        # session slots live on the main board only
+        self.kinds = [kk for kk in KEY_KINDS if not window.level or kk[0] != "session"]
         self.kind_row = Adw.ComboRow(title="Type")
-        self.kind_row.set_model(Gtk.StringList.new([label for _, label in KEY_KINDS]))
-        self.kind_row.set_selected(KIND_INDEX[kind])
+        self.kind_row.set_model(Gtk.StringList.new([label for _, label in self.kinds]))
+        self.kind_row.set_selected(next((n for n, kk in enumerate(self.kinds) if kk[0] == kind), 0))
         self.kind_row.connect("notify::selected", lambda *_: self.update_rows())
         group.add(self.kind_row)
+
+        self.open_row = Adw.ActionRow(title="Keys inside the folder",
+                                      subtitle=f"{len((k.get('keys') or {}))} set" if self.is_folder else "")
+        btn = Gtk.Button(label="Open folder")
+        btn.set_valign(Gtk.Align.CENTER)
+        btn.connect("clicked", lambda *_: (self.close(), self.window.enter_folder(self.index)))
+        self.open_row.add_suffix(btn)
+        group.add(self.open_row)
 
         self.hint = Gtk.Label(xalign=0, wrap=True, css_classes=["dim-label", "caption"],
                               margin_start=12, margin_end=12, margin_top=6, margin_bottom=6)
@@ -413,7 +434,7 @@ class KeyDialog(Adw.Dialog):
         self.update_rows()
 
     def kind(self):
-        return KEY_KINDS[self.kind_row.get_selected()][0]
+        return self.kinds[self.kind_row.get_selected()][0]
 
     def on_todo_file(self, path):
         self.todo_file.set_subtitle(path)
@@ -422,8 +443,9 @@ class KeyDialog(Adw.Dialog):
         kind = self.kind()
         self.hint.set_text(KIND_HINT.get(kind, ""))
         self.hint.set_visible(kind in KIND_HINT)
-        self.label_row.set_visible(kind in ("command", "mute_source", "mute_sink", "todo", "vpn"))
-        self.color_row.set_visible(kind == "command")
+        self.label_row.set_visible(kind in ("command", "folder", "mute_source", "mute_sink", "todo", "vpn"))
+        self.color_row.set_visible(kind in ("command", "folder"))
+        self.open_row.set_visible(kind == "folder" and self.is_folder)
         self.run_row.set_visible(kind == "command")
         self.team_row.set_visible(kind == "slack")
         self.vpn_row.set_visible(kind == "vpn")
@@ -446,7 +468,7 @@ class KeyDialog(Adw.Dialog):
         }
         tiles = [name for name, row in self.stats_tiles.items() if row.get_active()]
         connection = self.vpn_names[self.vpn_row.get_selected()] if self.vpn_names else None
-        set_key(self.window.cfg, self.index, self.kind(), label=label, color=color, run=self.run_row.get_text(),
+        set_key(self.cfg, self.index, self.kind(), label=label, color=color, run=self.run_row.get_text(),
                 team=team, todo=todo, tiles=tiles, connection=connection)
         self.window.save()
         self.window.refresh_grid()
@@ -460,6 +482,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         super().__init__(application=app, title=f"Deckmate settings  ·  v{version()}")
         self.set_default_size(620, 680)
         self.cfg = load_config()
+        self.level = []          # indices of the folders the key grid is inside, outermost first
         self._save_pending = None
         self._loading = True
 
@@ -482,6 +505,23 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._loading = False
         self.refresh_status()
         GLib.timeout_add(1000, self.refresh_status)
+
+    # -- folders --
+    def level_cfg(self):
+        """The config dict the key grid shows: the layout, or a folder's entry inside it."""
+        cfg = self.cfg
+        for idx in self.level:
+            cfg = (cfg.get("keys") or {}).get(str(idx)) or {}
+        return cfg
+
+    def enter_folder(self, index):
+        self.level.append(index)
+        self.refresh_grid()
+
+    def leave_folder(self):
+        if self.level:
+            self.level.pop()
+            self.refresh_grid()
 
     # -- saving --
     def save(self):
@@ -627,6 +667,13 @@ class SettingsWindow(Adw.ApplicationWindow):
         page = Adw.PreferencesPage()
         g = Adw.PreferencesGroup(title="Keys", description="Click a key to change what it does. "
                                  "The grid is laid out like the deck.")
+        bar = Gtk.Box(spacing=8, margin_bottom=8)
+        self.level_label = Gtk.Label(xalign=0, hexpand=True, css_classes=["heading"])
+        self.up_btn = Gtk.Button(label="Back to parent", visible=False)
+        self.up_btn.connect("clicked", lambda *_: self.leave_folder())
+        bar.append(self.level_label)
+        bar.append(self.up_btn)
+        g.add(bar)
         self.grid = Gtk.Grid(row_spacing=8, column_spacing=8, halign=Gtk.Align.CENTER)
         self.grid_buttons = []
         for i in range(KEY_COUNT):
@@ -643,13 +690,26 @@ class SettingsWindow(Adw.ApplicationWindow):
         return page
 
     def refresh_grid(self):
+        cfg = self.level_cfg()
+        names = ["Main board"]
+        walk = self.cfg
+        for idx in self.level:
+            walk = (walk.get("keys") or {}).get(str(idx)) or {}
+            names.append(walk.get("title") or f"folder {idx}")
+        self.level_label.set_text("  ›  ".join(names))
+        self.up_btn.set_visible(bool(self.level))
         for i, (b, lbl) in enumerate(self.grid_buttons):
-            kind, _ = key_kind(self.cfg, i)
-            text = key_summary(self.cfg, i)
-            body = GLib.markup_escape_text(text) if text else "<i>empty</i>"
-            lbl.set_markup(f"<small>{i}</small>\n{body}")
             for c in ("session-key", "command-key"):
                 b.remove_css_class(c)
+            if self.level and i == 0:
+                lbl.set_markup("<small>0</small>\nback")
+                b.set_sensitive(False)
+                continue
+            b.set_sensitive(True)
+            kind, _ = key_kind(cfg, i)
+            text = key_summary(cfg, i)
+            body = GLib.markup_escape_text(text) if text else "<i>empty</i>"
+            lbl.set_markup(f"<small>{i}</small>\n{body}")
             if kind == "session":
                 b.add_css_class("session-key")
             elif kind != "empty":
@@ -693,7 +753,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         return page
 
 class App(Adw.Application):
-    def __init__(self, screenshot=None, page=None, key=None):
+    def __init__(self, screenshot=None, page=None, key=None, folder=None):
         # one instance per session: launching again raises the open window.
         # A screenshot run must not land in a window that is already open.
         super().__init__(application_id=APP_ID,
@@ -701,6 +761,7 @@ class App(Adw.Application):
         self.screenshot = screenshot
         self.page = page
         self.key = key
+        self.folder = folder
 
     def do_activate(self):
         win = self.get_active_window()
@@ -718,6 +779,8 @@ class App(Adw.Application):
         win.present()
         if self.page:
             win.stack.set_visible_child_name(self.page)
+        if self.folder is not None:      # --folder N: show the key grid inside folder N
+            win.enter_folder(self.folder)
         if self.key is not None:
             KeyDialog(win, self.key).present(win)
         if self.screenshot:
@@ -739,5 +802,5 @@ if __name__ == "__main__":
     def opt(name):
         return sys.argv[sys.argv.index(name) + 1] if name in sys.argv else None
     key = opt("--key")
-    App(screenshot=opt("--screenshot"), page=opt("--page"),
+    App(screenshot=opt("--screenshot"), page=opt("--page"), folder=opt("--folder") and int(opt("--folder")),
         key=int(key) if key is not None else None).run([])

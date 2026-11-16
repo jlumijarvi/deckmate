@@ -5,6 +5,9 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- New `folder` key type: a key that opens a set of keys of its own, key 0
+  inside goes back and a hold on it returns to the main board. The settings
+  window edits a folder's keys in the same grid (#4).
 - Session keys: the title is one line and a second line says what the session
   is doing or asking: the tool and its description, the question's header,
   "approve plan", or how many subagents are running (#12).

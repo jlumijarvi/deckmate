@@ -39,11 +39,13 @@ nav = Navigator()   # the one navigator; deck.py gives it the main board
 
 
 class NavKey(Key):
-    """Back / previous page / next page."""
+    """Back / previous page / next page. With hold_action, a hold runs that instead."""
 
-    def __init__(self, symbol, label, action):
+    def __init__(self, symbol, label, action, hold_action=None):
         super().__init__({})
         self.symbol, self.label, self.action = symbol, label, action
+        self.hold_action = hold_action
+        self.holdable = hold_action is not None
 
     def render(self, pressed):
         img, d, fg = tile((36, 36, 44), pressed)
@@ -53,3 +55,12 @@ class NavKey(Key):
 
     def press(self):
         self.action()
+
+    def hold(self):
+        if self.hold_action:
+            self.hold_action()
+
+
+def back_key():
+    """Key 0 of every folder and page: press goes back one level, hold goes to the main board."""
+    return NavKey("<", "back", nav.pop, hold_action=nav.home)
