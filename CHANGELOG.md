@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.9.2 (2026-11-16)
 
 - Stats: a session limit reported without a window shows "—" instead of
   100% left; the key shows the data's age after ten minutes and greys it after
