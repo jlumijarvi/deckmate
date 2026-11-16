@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.9.0 (2026-11-16)
 
 - New `folder` key type: a key that opens a set of keys of its own, key 0
   inside goes back and a hold on it returns to the main board. The settings
