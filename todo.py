@@ -5,7 +5,8 @@ File format, one item per line:
   - [ ] Title  @2026-11-20  [notes](~/Documents/notes/x.md)
   - [x] Done items are ignored
 Title is everything else on the line; the due date is a YYYY-MM-DD after '@';
-the link is a Markdown link (its text is ignored) or a bare path ending in .md.
+the link is a Markdown link (its text is ignored; a web URL, or a file path
+relative to the list) or a bare path ending in .md.
 """
 import os
 import re
@@ -14,7 +15,7 @@ from datetime import date, datetime
 
 ITEM_RE = re.compile(r"^\s*[-*+]\s+\[( |x|X)\]\s+(.*)$")
 DUE_RE = re.compile(r"@(\d{4}-\d{2}-\d{2})")
-LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
+LINK_RE = re.compile(r"\[([^\]]*)\]\(((?:[^()\s]|\([^()]*\))+)\)")   # one level of () inside the URL
 BARE_PATH_RE = re.compile(r"(?<!\S)((?:~|\.{0,2})?/[^\s]+\.md)(?!\S)")
 
 SAMPLE = """# To do

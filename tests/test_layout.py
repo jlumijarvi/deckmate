@@ -96,6 +96,16 @@ class LayoutTest(unittest.TestCase):
         self.assertNotIn("label", text)
         self.assertIn('"title": "Tasks"', text)
 
+    def test_sample_list_only_for_the_default_file(self):
+        other = os.path.join(self.tmp.name, "work.md")
+        with open(self.path, "w") as f:
+            json.dump({"keys": {"0": {"type": "todo", "file": other}}}, f)
+        keys, *_ = load_board(self.path)
+        self.assertFalse(os.path.exists(other))
+        keys[0].todo.refresh()
+        self.assertFalse(keys[0].todo.exists)
+        self.assertEqual(keys[0].render(False).size, (KEY_PX, KEY_PX))   # draws "no file"
+
     def test_unknown_type_and_bad_index_are_ignored(self):
         with open(self.path, "w") as f:
             json.dump({"keys": {"3": {"type": "nonsense"}, "99": {"type": "clock"}}}, f)

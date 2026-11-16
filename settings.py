@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Settings window for the Deckmate board.
 
-Edits keys.json (the running deck.py picks changes up within a second), starts
-and stops the board, and can replace the picture stored inside the deck.
+Edits keys.json (the running board picks changes up within a second), starts
+and stops the board and the tray icon, and shows the connected deck.
 
     python3 settings.py
 """
@@ -662,13 +662,19 @@ class SettingsWindow(Adw.ApplicationWindow):
 
 class App(Adw.Application):
     def __init__(self, screenshot=None, page=None, key=None):
+        # one instance per session: launching again raises the open window.
+        # A screenshot run must not land in a window that is already open.
         super().__init__(application_id=APP_ID,
-                         flags=Gio.ApplicationFlags.NON_UNIQUE)
+                         flags=Gio.ApplicationFlags.NON_UNIQUE if screenshot else Gio.ApplicationFlags.FLAGS_NONE)
         self.screenshot = screenshot
         self.page = page
         self.key = key
 
     def do_activate(self):
+        win = self.get_active_window()
+        if win is not None:
+            win.present()
+            return
         css = Gtk.CssProvider()
         css.load_from_string("""
             .session-key { background: alpha(#3b82f6, 0.35); }

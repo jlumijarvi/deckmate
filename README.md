@@ -163,8 +163,12 @@ item per line:
 - [x] Done items are hidden
 ```
 
-`@date` is the due date, a Markdown link (or a bare path ending in .md) is
-opened when the item's key is pressed. The file is watched, so saving it in an
+`@date` is the due date. A Markdown link is opened when the item's key is
+pressed: a web link (`[docs](https://example.com/page)`) with the default
+browser, a file path (absolute, `~`, or relative to the list file) with
+`open_with`; a bare path ending in .md works as a link too. The default list
+is created with an example on first use; a list at another path is left for
+you (or another program) to create and shows "no file" until then. The file is watched, so saving it in an
 editor updates the deck within a second. Holding an item's key for about half
 a second ticks its box in the file (`- [ ]` becomes `- [x]`), which is the only
 write the deck ever makes to it; the switch "Hold an item's key to mark it

@@ -32,6 +32,10 @@ def item_urgency(item, soon_days):
     return "ok"
 
 
+def is_web_link(link):
+    return link.lower().startswith(("http://", "https://"))
+
+
 class TodoKey(Key):
     """Badge: number of open items, coloured by the most urgent one."""
     dynamic = True
@@ -94,9 +98,13 @@ class TodoItemKey(Key):
         return img
 
     def press(self):
-        if not self.item.link:
+        link = self.item.link
+        if not link:
             return
-        path = os.path.expanduser(self.item.link)
+        if is_web_link(link):
+            launch(f"xdg-open {shlex.quote(link)}")
+            return
+        path = os.path.expanduser(link)
         if not os.path.isabs(path):
             path = os.path.join(os.path.dirname(self.todo.path), path)
         opener = self.cfg.get("open_with") or "code"

@@ -3,6 +3,14 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Slack key: the @mentions line no longer overlaps the workspace name (#7).
+- Settings: launching the settings again raises the open window instead of
+  opening another (#8).
+- To-do: web links open in the browser, a URL may contain parentheses, and the
+  sample list is only created for the default file (#13).
+
 ## 0.8.0 (2026-11-15)
 
 - New `media` key type for Spotify (or any MPRIS player): play/pause with the

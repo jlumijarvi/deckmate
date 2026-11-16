@@ -81,3 +81,14 @@ class MarkDoneTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LinkTest(unittest.TestCase):
+    def test_web_link_with_parentheses(self):
+        items = todo.parse("- [ ] Search [list](https://example.com/search?q=owner()) now\n")
+        self.assertEqual(items[0].link, "https://example.com/search?q=owner()")
+        self.assertEqual(items[0].title, "Search now")
+
+    def test_plain_web_link_and_file_link(self):
+        items = todo.parse("- [ ] A [docs](https://example.com/page)\n- [ ] B [n](notes/b.md)\n")
+        self.assertEqual([i.link for i in items], ["https://example.com/page", "notes/b.md"])

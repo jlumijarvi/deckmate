@@ -64,10 +64,11 @@ def load_board(path):
             file = os.path.expanduser(kcfg.get("file") or os.path.join(CONFIG_DIR, "todo.md"))
             if file not in lists:
                 lists[file] = TodoList(file, kcfg.get("soon_days", 0))
-                try:
-                    lists[file].ensure_file()
-                except OSError as e:
-                    log.info(f"todo: cannot create {file}: {e}")
+                if not kcfg.get("file"):   # the sample list only for the default file
+                    try:
+                        lists[file].ensure_file()
+                    except OSError as e:
+                        log.info(f"todo: cannot create {file}: {e}")
                 providers.append(lists[file])
             keys[i] = TodoKey(kcfg, lists[file])
     return keys, int(cfg.get("brightness", 60)), providers, ScreenSaver(cfg.get("screensaver", {}))

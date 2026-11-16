@@ -23,6 +23,10 @@ or a big clock; any key press brings the board back without running that key.
 sleep_min is the deck's own backlight-off timer (0 = never). On exit the saver is
 painted one last time, so it stays on the deck's screen instead of the stored image.
 
+  counter             "state" waiting | running | done: how many sessions; press filters
+  pager               "dir" prev | next: pages of session slots; hold prev: hidden sessions
+  stats               the five-hour window left; press opens the stats page
+
 A "sessions" entry claims a list of keys for live Claude Code sessions, one per
 key, sorted waiting / running / done / stopped / failed. Press opens the session's
 folder in VS Code, which raises the window that already has it open.
