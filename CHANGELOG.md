@@ -3,6 +3,11 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Stats: the limits show percent used, as Claude Code's usage panel does, not
+  percent left; amber from 75%, red from 90%.
+
 ## 0.9.2 (2026-11-16)
 
 - Stats: a session limit reported without a window shows "—" instead of

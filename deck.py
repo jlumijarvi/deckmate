@@ -27,7 +27,7 @@ painted one last time, so it stays on the deck's screen instead of the stored im
 
   counter             "state" waiting | running | done: how many sessions; press filters
   pager               "dir" prev | next: pages of session slots; hold prev: hidden sessions
-  stats               percent left of the session, week and model limits; press opens the
+  stats               percent used of the session, week and model limits; press opens the
                       stats page; "tiles": ["tokens", "cache", "context"] adds those tiles
 
 A "sessions" entry claims a list of keys for live Claude Code sessions, one per

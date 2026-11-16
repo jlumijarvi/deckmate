@@ -36,14 +36,15 @@ class Limit:
     def idle(self):
         """No window running: the source reports nothing used and no reset time.
         Claude Code's cache says this for the session limit even mid-session, so
-        the number is shown as unknown rather than as 100% left."""
+        the number is shown as unknown rather than as 0% used."""
         return self.resets_at is None and not self.used
 
     @property
-    def left(self):
+    def used_pct(self):
+        """Percent used, or None when unknown (no number, or no window running)."""
         if self.used is None or self.idle:
             return None
-        return max(0, 100 - int(self.used))
+        return max(0, min(100, int(self.used)))
 
 
 def parse_iso(s):
@@ -189,11 +190,12 @@ class Usage:
         self.limits = merged
         self._started = True
 
-    def left(self, name):
+    def used(self, name):
+        """Percent used as shown: 0 right after a window reset, until fresh numbers arrive."""
         lim = self.limits.get(name)
         if lim is None:
             return None
-        return 100 if self.new_window.get(name) else lim.left
+        return 0 if self.new_window.get(name) else lim.used_pct
 
     def age(self, name):
         lim = self.limits.get(name)

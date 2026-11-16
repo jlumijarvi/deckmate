@@ -31,9 +31,9 @@ class ParseTest(unittest.TestCase):
     def test_limits(self):
         lims = parse_usage_cache(cache()["cachedUsageUtilization"])
         self.assertEqual(sorted(lims), ["scoped", "session", "week"])
-        self.assertEqual(lims["session"].left, 90)
-        self.assertEqual(lims["week"].left, 60)
-        self.assertEqual((lims["scoped"].label, lims["scoped"].left), ("Fable", 95))
+        self.assertEqual(lims["session"].used_pct, 10)
+        self.assertEqual(lims["week"].used_pct, 40)
+        self.assertEqual((lims["scoped"].label, lims["scoped"].used_pct), ("Fable", 5))
         self.assertAlmostEqual(lims["session"].resets_at, T0 + 3600)
         self.assertAlmostEqual(lims["session"].at, T0)
 
@@ -42,7 +42,7 @@ class ParseTest(unittest.TestCase):
         del c["utilization"]["limits"]
         lims = parse_usage_cache(c)
         self.assertEqual(sorted(lims), ["session", "week"])
-        self.assertEqual(lims["week"].left, 60)
+        self.assertEqual(lims["week"].used_pct, 40)
 
     def test_nothing(self):
         self.assertEqual(parse_usage_cache(None), {})
@@ -71,7 +71,7 @@ class UsageTest(unittest.TestCase):
         self.write(self.cache_path, cache())
         u = self.usage()
         u.refresh()
-        self.assertEqual((u.left("session"), u.left("week"), u.left("scoped")), (90, 60, 95))
+        self.assertEqual((u.used("session"), u.used("week"), u.used("scoped")), (10, 40, 5))
         self.assertEqual(u.reset_events, [])
         self.assertFalse(u.stale("session"))
         self.assertEqual(u.limits["session"].source, "code")
@@ -81,7 +81,7 @@ class UsageTest(unittest.TestCase):
         self.write(self.desktop_path, {"samples": [{"t": int((T0 - 60) * 1000), "u": {"fh": 55, "sd": 42}}]})
         u = self.usage()
         u.refresh()
-        self.assertEqual((u.left("session"), u.left("week"), u.left("scoped")), (45, 58, 95))
+        self.assertEqual((u.used("session"), u.used("week"), u.used("scoped")), (55, 42, 5))
         self.assertEqual(u.limits["session"].source, "desktop")
         self.assertAlmostEqual(u.limits["session"].resets_at, T0 + 3600)   # reset time kept from the cache
 
@@ -97,7 +97,7 @@ class UsageTest(unittest.TestCase):
         u.refresh()
         self.assertEqual(u.reset_events, ["session"])
         self.assertTrue(u.new_window["session"])
-        self.assertEqual(u.left("session"), 100)
+        self.assertEqual(u.used("session"), 0)
         u.refresh()
         self.assertEqual(u.reset_events, [])        # fires once
         # fresh data from after the reset ends the "new window" state
@@ -105,7 +105,7 @@ class UsageTest(unittest.TestCase):
         self.write(self.cache_path, cache(session=3, at=T0 + 650, session_reset=T0 + 650 + 18000))
         u.refresh()
         self.assertFalse(u.new_window["session"])
-        self.assertEqual(u.left("session"), 97)
+        self.assertEqual(u.used("session"), 3)
         self.assertEqual(u.reset_events, [])
 
     def test_reset_seen_in_data_first_fires_once(self):
@@ -141,14 +141,14 @@ class UsageTest(unittest.TestCase):
         u = self.usage()
         u.refresh()
         self.assertTrue(u.limits["session"].idle)
-        self.assertIsNone(u.left("session"))
-        self.assertEqual(u.left("week"), 60)
+        self.assertIsNone(u.used("session"))
+        self.assertEqual(u.used("week"), 40)
 
     def test_missing_files(self):
         u = self.usage()
         u.refresh()
         self.assertEqual(u.limits, {})
-        self.assertIsNone(u.left("session"))
+        self.assertIsNone(u.used("session"))
         self.assertTrue(u.stale("session"))
 
     def test_half_written_cache_keeps_the_last_values(self):
@@ -159,15 +159,15 @@ class UsageTest(unittest.TestCase):
             f.write('{"cachedUsageUtilization": {"fetchedAt')
         os.utime(self.cache_path, (self.now + 1, self.now + 1))
         u.refresh()
-        self.assertEqual(u.left("week"), 60)
+        self.assertEqual(u.used("week"), 40)
 
 
 class PlanUsageTest(unittest.TestCase):
     def test_desktop_samples(self):
         p = PlanUsage("/nonexistent")
         p.apply([{"t": 1000, "u": {"fh": 60, "sd": 30}}, {"t": 2000, "u": {"fh": 70, "sd": 31}}])
-        self.assertEqual(p.limit("session").left, 30)
-        self.assertEqual(p.limit("week").left, 69)
+        self.assertEqual(p.limit("session").used_pct, 70)
+        self.assertEqual(p.limit("week").used_pct, 31)
         self.assertEqual(p.sampled_at, 2.0)
 
     def test_missing_file(self):

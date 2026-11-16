@@ -1,5 +1,6 @@
-"""The stats key and page: what is left of the session, weekly and model-scoped
-limits, with optional tiles for tokens today, cache reads and the fullest context."""
+"""The stats key and page: how much of the session, weekly and model-scoped
+limits is used, as Claude Code's own usage panel shows it, with optional tiles
+for tokens today, cache reads and the fullest context."""
 from deckhid import KEY_COUNT, KEY_PX
 from keys import Blank, Key
 from pages import back_key, nav
@@ -23,14 +24,14 @@ def stats_provider():
     return _stats_provider
 
 
-def limit_color(left, new_window=False, stale=False):
+def limit_color(used, new_window=False, stale=False):
     if stale:
         return GREY
     if new_window:
         return CYAN
-    if left is None:
+    if used is None:
         return GREY
-    return RED if left < 10 else AMBER if left < 25 else BLUE
+    return RED if used >= 90 else AMBER if used >= 75 else BLUE
 
 
 def context_color(frac):
@@ -38,7 +39,7 @@ def context_color(frac):
 
 
 class StatsKey(Key):
-    """Three rows, one per limit: its name, the percent left and a thin bar.
+    """Three rows, one per limit: its name, the percent used and a bar that fills up.
     Bottom right: when the session window resets, or the age of stale data.
     Press opens the stats page. cfg "tiles" lists the optional page tiles."""
     dynamic = True
@@ -55,17 +56,17 @@ class StatsKey(Key):
             lim = usage.limits.get(name)
             if lim is None:
                 continue
-            left = usage.left(name)
-            color = limit_color(left, usage.new_window.get(name), usage.stale(name))
+            used = usage.used(name)
+            color = limit_color(used, usage.new_window.get(name), usage.stale(name))
             label_fg = (200, 200, 210) if not pressed else fg
             label = "5 h" if name == "session" else lim.label[:7]
             d.text((4, y), label, font=font(9, False), fill=label_fg)
-            value = "new" if usage.new_window.get(name) else "—" if left is None else f"{left}%"
+            value = "new" if usage.new_window.get(name) else "—" if used is None else f"{used}%"
             f = font(11)
             d.text((KEY_PX - 4 - d.textlength(value, font=f), y - 1), value, font=f, fill=fg)
             d.rectangle([4, y + 12, KEY_PX - 4, y + 14], fill=(40, 44, 52) if not pressed else (220, 220, 220))
-            if left is not None:
-                d.rectangle([4, y + 12, 4 + int((KEY_PX - 8) * left / 100), y + 14],
+            if used is not None:
+                d.rectangle([4, y + 12, 4 + int((KEY_PX - 8) * used / 100), y + 14],
                             fill=color if not pressed else (0, 0, 0))
             y += 18
         if not usage.limits:
@@ -104,10 +105,10 @@ class StatsPage:
             lim = usage.limits.get(name)
             if lim is None:
                 continue
-            left = usage.left(name)
+            used = usage.used(name)
             new = usage.new_window.get(name)
             stale = usage.stale(name)
-            color = limit_color(left, new, stale)
+            color = limit_color(used, new, stale)
             if new:
                 foot = "new window"
             elif stale and usage.age(name) is not None:
@@ -117,9 +118,9 @@ class StatsPage:
             elif lim.idle:
                 foot = "unknown"
             else:
-                foot = "left"
+                foot = "used"
             title = {"session": "session · 5 h", "week": "week"}.get(name, lim.label + " · week")
-            keys[n] = StatTile(title, "100%" if new else "—" if left is None else f"{left}%", color, foot, border=new)
+            keys[n] = StatTile(title, "0%" if new else "—" if used is None else f"{used}%", color, foot, border=new)
             n += 1
         newest = max((lim for lim in usage.limits.values() if lim.at), key=lambda lim: lim.at, default=None)
         if newest is not None:

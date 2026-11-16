@@ -110,7 +110,7 @@ a plain button with a shell command, or a live key:
 | `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a folder (a set of keys with a back key top left) |
 | `counter` (`state`: waiting, running or done) | how many sessions are in that state | shows only that state: bright border on the counter, empty slots and the pager name the filter, and it clears itself when no session is in that state any more; hold on the done counter hides every done session |
 | `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page; hold shows hidden sessions. next: next page |
-| `stats` | percent left of the session, week and model limits, one row each | opens the stats page |
+| `stats` | percent used of the session, week and model limits, one row each, like Claude Code's usage panel | opens the stats page |
 
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
 sessions fill them. Titles that do not fit wrap and shrink
@@ -163,10 +163,11 @@ bottom-left corner, so they stand out from ordinary buttons.
 
 ### Stats page
 
-Opened by a `stats` key. The key itself shows what is left of the three plan
-limits (the five-hour session, the week, and the weekly limit of one model
-such as Fable), each as a percent and a bar, with the session's reset time
-bottom right. The page has one tile per limit with its reset time, and a
+Opened by a `stats` key. The key itself shows how much of the three plan
+limits is used (the five-hour session, the week, and the weekly limit of one
+model such as Fable), each as a percent and a bar that fills up, the same way
+Claude Code's own usage panel shows them, with the session's reset time
+bottom right. Amber from 75% used, red from 90%. The page has one tile per limit with its reset time, and a
 "data" tile saying how old the numbers are and where they came from. Three
 more tiles can be turned on in the key's dialog: tokens today (output large,
 input and cache writes small), cache reads today with the number of replies,
@@ -180,7 +181,7 @@ newer. The key shows the numbers' age once they are over ten minutes old and
 greys them after two hours. A session limit the source reports without a
 window (nothing used, no reset time) shows as "—", since Claude Code's cache
 says that even mid-session. When a window's reset time passes the
-deck pulses cyan and the limit reads "new" until fresh numbers arrive.
+deck pulses cyan and the limit reads "new" (0% used) until fresh numbers arrive.
 
 ## To-do list
 

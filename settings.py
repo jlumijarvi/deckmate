@@ -78,7 +78,7 @@ KIND_HINT = {
     "pager_next": "Next page of sessions",
     "brightness": "Shows the deck's brightness; press steps it 30 / 60 / 100",
     "vpn": "A NetworkManager VPN connection: shows on or off, press switches it",
-    "stats": "What is left of the session, week and model limits; press opens the stats page",
+    "stats": "How much of the session, week and model limits is used; press opens the stats page",
 }
 
 
