@@ -175,8 +175,11 @@ over every transcript on this account since local midnight, subagents
 included; they measure this account's activity, not the plan.
 
 The limits come from Claude Code's own cache, refreshed while Claude Code
-runs; the desktop app's file is used when it is newer. Numbers older than 30
-minutes are greyed and show their age. When a window's reset time passes the
+runs, at its own irregular pace; the desktop app's file is used when it is
+newer. The key shows the numbers' age once they are over ten minutes old and
+greys them after two hours. A session limit the source reports without a
+window (nothing used, no reset time) shows as "—", since Claude Code's cache
+says that even mid-session. When a window's reset time passes the
 deck pulses cyan and the limit reads "new" until fresh numbers arrive.
 
 ## To-do list

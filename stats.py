@@ -19,7 +19,8 @@ from datetime import datetime
 CLAUDE_JSON = os.path.expanduser("~/.claude.json")
 PLAN_USAGE = os.path.expanduser("~/.config/Claude/plan-usage-history.json")
 PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
-STALE_S = 30 * 60      # older data is shown greyed, with its age
+STALE_S = 2 * 3600     # older data is shown greyed; its age is shown from AGE_SHOWN_S on
+AGE_SHOWN_S = 10 * 60
 
 
 @dataclass
@@ -32,8 +33,17 @@ class Limit:
     at: float | None          # epoch seconds when the number was sampled
 
     @property
+    def idle(self):
+        """No window running: the source reports nothing used and no reset time.
+        Claude Code's cache says this for the session limit even mid-session, so
+        the number is shown as unknown rather than as 100% left."""
+        return self.resets_at is None and not self.used
+
+    @property
     def left(self):
-        return None if self.used is None else max(0, 100 - int(self.used))
+        if self.used is None or self.idle:
+            return None
+        return max(0, 100 - int(self.used))
 
 
 def parse_iso(s):

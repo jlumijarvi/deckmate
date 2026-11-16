@@ -4,7 +4,7 @@ from deckhid import KEY_COUNT, KEY_PX
 from keys import Blank, Key
 from pages import back_key, nav
 from render import CYAN, MARK_W, code_mark, dim, draw_centered_lines, fit_lines, font, tile
-from stats import StatsProvider, age_text, fmt_tokens
+from stats import AGE_SHOWN_S, StatsProvider, age_text, fmt_tokens
 
 LIMIT_ORDER = ("session", "week", "scoped")
 OPTIONAL_TILES = ("tokens", "cache", "context")
@@ -71,9 +71,10 @@ class StatsKey(Key):
         if not usage.limits:
             draw_centered_lines(d, ["no data"], fg, size=12, top=28)
         foot, foot_fg = "", (170, 170, 180)
-        if usage.stale("session"):
-            foot = f"{age_text(usage.age('session'))} old" if usage.age("session") is not None else ""
-            foot_fg = GREY
+        age = usage.age("week") if usage.age("week") is not None else usage.age("session")
+        if age is not None and age > AGE_SHOWN_S:       # older numbers say so; grey once stale
+            foot = f"{age_text(age)} old"
+            foot_fg = GREY if usage.stale("week") else (170, 170, 180)
         elif usage.reset_text("session"):
             foot = "→ " + usage.reset_text("session")
         if foot:
@@ -113,8 +114,8 @@ class StatsPage:
                 foot = f"{age_text(usage.age(name))} old"
             elif usage.reset_text(name):   # "→ 22:36" for the session, "Tue 06:00" for the week
                 foot = ("→ " if name == "session" else "") + usage.reset_text(name)
-            elif name == "session" and not (lim.used or 0):
-                foot = "idle"
+            elif lim.idle:
+                foot = "unknown"
             else:
                 foot = "left"
             title = {"session": "session · 5 h", "week": "week"}.get(name, lim.label + " · week")
@@ -124,7 +125,7 @@ class StatsPage:
         if newest is not None:
             age = usage.age(newest.name)
             keys[n] = StatTile("Claude Code" if newest.source == "code" else "desktop app", age_text(age),
-                               GREY if age is not None and age > 30 * 60 else (90, 110, 130), "data age")
+                               GREY if usage.stale(newest.name) else (90, 110, 130), "data age")
             n += 1
         tin, tout, tcache, msgs = st.tokens()
         for name in self.tiles:

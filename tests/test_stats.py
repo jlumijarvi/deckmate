@@ -119,13 +119,30 @@ class UsageTest(unittest.TestCase):
         self.assertFalse(u.new_window["session"])
 
     def test_stale_and_age(self):
-        self.write(self.cache_path, cache(at=T0 - 2 * 3600))
+        self.write(self.cache_path, cache(at=T0 - 3 * 3600))
         u = self.usage()
         u.refresh()
         self.assertTrue(u.stale("session"))
-        self.assertEqual(age_text(u.age("session")), "2 h")
+        self.assertEqual(age_text(u.age("session")), "3 h")
+        self.write(self.cache_path, cache(at=T0 - 3600))
+        fresh = self.usage()
+        fresh.refresh()
+        self.assertFalse(fresh.stale("session"))      # an hour old is still shown in colour
         self.assertEqual(u.reset_text("session"), datetime.fromtimestamp(T0 + 3600).strftime("%H:%M"))
         self.assertEqual(u.reset_text("week"), datetime.fromtimestamp(T0 + 5 * 86400).strftime("%a %H:%M"))
+
+    def test_session_without_a_window_is_unknown_not_full(self):
+        c = cache()
+        for lim in c["cachedUsageUtilization"]["utilization"]["limits"]:
+            if lim["kind"] == "session":
+                lim["percent"], lim["resets_at"] = 0, None
+        c["cachedUsageUtilization"]["utilization"]["five_hour"] = {"utilization": 0, "resets_at": None}
+        self.write(self.cache_path, c)
+        u = self.usage()
+        u.refresh()
+        self.assertTrue(u.limits["session"].idle)
+        self.assertIsNone(u.left("session"))
+        self.assertEqual(u.left("week"), 60)
 
     def test_missing_files(self):
         u = self.usage()

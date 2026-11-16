@@ -5,6 +5,9 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- Stats: a session limit reported without a window shows "—" instead of
+  100% left; the key shows the data's age after ten minutes and greys it after
+  two hours (the cache refreshes at an irregular pace).
 - The back key in folders and pages is an arrow, without text.
 
 ## 0.9.1 (2026-11-16)
