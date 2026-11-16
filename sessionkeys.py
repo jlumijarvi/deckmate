@@ -220,7 +220,7 @@ class SessionSlot(Key):
         s = self.session
         if s is not None and s.state == "running":
             img, d, fg = tile((60, 60, 70), False)
-            draw_centered_lines(d, ["running,", "not", "dismissed"], fg, size=12, top=14)
+            draw_centered_lines(d, ["running,", "not", "hidden"], fg, size=12, top=14)
             return img
         img, d, fg = tile((40, 40, 50), False)
         draw_centered_lines(d, ["hidden"], fg, size=16, top=26)

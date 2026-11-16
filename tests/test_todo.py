@@ -79,9 +79,6 @@ class MarkDoneTest(unittest.TestCase):
         self.assertNotIn("[x]", open(self.path).read())
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class LinkTest(unittest.TestCase):
     def test_web_link_with_parentheses(self):
@@ -92,3 +89,7 @@ class LinkTest(unittest.TestCase):
     def test_plain_web_link_and_file_link(self):
         items = todo.parse("- [ ] A [docs](https://example.com/page)\n- [ ] B [n](notes/b.md)\n")
         self.assertEqual([i.link for i in items], ["https://example.com/page", "notes/b.md"])
+
+
+if __name__ == "__main__":
+    unittest.main()

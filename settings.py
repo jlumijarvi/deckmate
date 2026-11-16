@@ -8,7 +8,6 @@ and stops the board and the tray icon, and shows the connected deck.
 """
 import os
 import shutil
-import signal
 import subprocess
 import sys
 import time
@@ -25,12 +24,11 @@ GLib.set_prgname(APP_ID)
 
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, KEY_COUNT  # noqa: E402
 from slackstate import SlackState  # noqa: E402
+from system import board_pid, service_loaded, start_board, stop_board, tray_pid  # noqa: E402
 from vpnkey import vpn_connections  # noqa: E402
 
-from paths import (HERE, CONFIG, EXAMPLE, PID_FILE, TRAY_PID_FILE,  # noqa: E402
-                   config_path, read_layout, version, write_layout)
+from paths import HERE, CONFIG, EXAMPLE, config_path, read_layout, version, write_layout  # noqa: E402
 
-DECK_PY = os.path.join(HERE, "deck.py")
 
 KEY_KINDS = [
     ("empty", "Empty"),
@@ -162,6 +160,9 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
         keys[str(i)] = {"type": "volume", "step": -5}
     elif kind == "volume_up":
         keys[str(i)] = {"type": "volume", "step": 5}
+    new = keys.get(str(i))
+    if new is not None and old and old.get("type", "command") == new.get("type", "command"):
+        keys[str(i)] = {**old, **new}      # keep fields the dialog does not show (steps, step, player, ...)
     if sess or "sessions" in cfg:   # a folder has no session slots: do not give it a "sessions" entry
         cfg.setdefault("sessions", {})["keys"] = sorted(sess)
     cfg["keys"] = {k: keys[k] for k in sorted(keys, key=int)}
@@ -202,21 +203,7 @@ def key_summary(cfg, i):
 
 # --- the board process -------------------------------------------------------
 
-def pid_from(path):
-    try:
-        with open(path) as f:
-            pid = int(f.read().strip())
-    except (OSError, ValueError):
-        return None
-    return pid if os.path.exists(f"/proc/{pid}") else None
-
-
-def board_pid():
-    return pid_from(PID_FILE)
-
-
-def tray_pid():
-    return pid_from(TRAY_PID_FILE)
+DEFAULT_TODO = "~/.config/deckmate/todo.md"   # the list a to-do key gets without a "file" of its own
 
 
 def start_tray():
@@ -233,42 +220,6 @@ def start_tray():
             return
     subprocess.Popen(cmd, cwd=HERE, start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-
-SERVICE = "deckmate.service"
-
-
-def service_installed():
-    """True when systemd knows a deckmate.service for this user."""
-    try:
-        out = subprocess.run(["systemctl", "--user", "show", SERVICE, "-p", "LoadState", "--value"],
-                             capture_output=True, text=True, timeout=5).stdout.strip()
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return out == "loaded"
-
-
-def start_board():
-    if service_installed():
-        subprocess.run(["systemctl", "--user", "start", SERVICE], check=False)
-        return
-    subprocess.Popen([sys.executable, DECK_PY], cwd=HERE, start_new_session=True,
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-
-def stop_board(timeout=5.0):
-    pid = board_pid()
-    if service_installed():
-        subprocess.run(["systemctl", "--user", "stop", SERVICE], check=False)
-    if pid is None:
-        return
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except OSError:
-        return
-    end = time.monotonic() + timeout
-    while time.monotonic() < end and os.path.exists(f"/proc/{pid}"):
-        time.sleep(0.1)
 
 
 # --- dialogs -----------------------------------------------------------------
@@ -391,7 +342,7 @@ class KeyDialog(Adw.Dialog):
 
         # to-do list rows
         self.todo_file = Adw.ActionRow(title="List file")
-        self.todo_file.set_subtitle(k.get("file") or "~/.config/deckmate/todo.md")
+        self.todo_file.set_subtitle(k.get("file") or DEFAULT_TODO)
         btn = Gtk.Button(label="Choose…")
         btn.set_valign(Gtk.Align.CENTER)
         btn.connect("clicked", lambda *_: choose_file(self.window, self.on_todo_file, "Choose the to-do list file"))
@@ -459,8 +410,9 @@ class KeyDialog(Adw.Dialog):
         color = "#%02x%02x%02x" % (round(rgba.red * 255), round(rgba.green * 255), round(rgba.blue * 255))
         team = self.workspaces[self.team_row.get_selected()]["id"] if self.workspaces else None
         label = self.label_row.get_text().replace("\\n", "\n")
+        file = self.todo_file.get_subtitle()
         todo = {
-            "file": self.todo_file.get_subtitle(),
+            **({"file": file} if file and file != DEFAULT_TODO else {}),
             "open_with": self.todo_open.get_text().strip() or "code",
             "soon_days": int(self.todo_soon.get_value()),
             "hold_done": bool(self.todo_hold.get_active()),
@@ -653,7 +605,7 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def refresh_status(self):
         pid = board_pid()
-        how = " (login service)" if service_installed() else ""
+        how = " (login service)" if service_loaded() else ""
         self.status_row.set_subtitle((f"running, pid {pid}" if pid else "not running") + how)
         self.start_btn.set_sensitive(pid is None)
         self.stop_btn.set_sensitive(pid is not None)

@@ -22,36 +22,14 @@ gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import GLib, Gtk  # noqa: E402
 from gi.repository import AyatanaAppIndicator3 as AppIndicator  # noqa: E402
 
-from paths import (HERE, INSTALLED, PID_FILE, REPO, STATUS_FILE, TRAY_PID_FILE,  # noqa: E402
-                   config_path, ensure_dirs, version)
+from paths import HERE, INSTALLED, REPO, STATUS_FILE, TRAY_PID_FILE, config_path, ensure_dirs, version  # noqa: E402
+from system import SERVICE, board_pid, run, service_loaded, start_board, stop_board  # noqa: E402
 
-SERVICE = "deckmate.service"
 UPDATE_CHECK_S = 3600
 INSTALL_HELPER = "/usr/lib/deckmate/install-update"   # root helper, passwordless through polkit
 ICON = "deckmate-symbolic"
 ICON_ATTENTION = "deckmate-attention-symbolic"
 ICON_OFF = "deckmate-off-symbolic"
-
-
-def sh(*cmd, timeout=10):
-    try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    except (OSError, subprocess.SubprocessError):
-        return None
-
-
-def service_loaded():
-    r = sh("systemctl", "--user", "show", SERVICE, "-p", "LoadState", "--value")
-    return bool(r) and r.stdout.strip() == "loaded"
-
-
-def board_pid():
-    try:
-        with open(PID_FILE) as f:
-            pid = int(f.read().strip())
-    except (OSError, ValueError):
-        return None
-    return pid if os.path.exists(f"/proc/{pid}") else None
 
 
 def read_status():
@@ -74,14 +52,14 @@ def adopt_service():
     if INSTALLED and os.path.exists(old):
         with open(old) as f:
             if HERE not in f.read():
-                sh("systemctl", "--user", "disable", "--now", SERVICE)
+                run("systemctl", "--user", "disable", "--now", SERVICE)
                 os.remove(old)
                 for link in (os.path.expanduser("~/.config/systemd/user/graphical-session.target.wants/" + SERVICE),):
                     if os.path.islink(link):
                         os.remove(link)
-                sh("systemctl", "--user", "daemon-reload")
+                run("systemctl", "--user", "daemon-reload")
     if service_loaded():
-        sh("systemctl", "--user", "start", SERVICE)
+        run("systemctl", "--user", "start", SERVICE)
 
 
 def auto_update_enabled():
@@ -136,12 +114,12 @@ class Tray:
         self.menu.show_all()
         self.ind.set_menu(self.menu)
 
-        self.refresh()
+        self.refrerun()
         GLib.timeout_add(2000, self.refresh)
         GLib.timeout_add_seconds(30, self.check_updates_later)
 
     # -- status --
-    def refresh(self):
+    def refrerun(self):
         pid = board_pid()
         status = read_status() if pid else None
         if pid is None:
@@ -170,21 +148,10 @@ class Tray:
 
     # -- actions --
     def start(self):
-        if service_loaded():
-            sh("systemctl", "--user", "start", SERVICE)
-        else:
-            subprocess.Popen([sys.executable, os.path.join(HERE, "deck.py")], cwd=HERE, start_new_session=True,
-                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        start_board()
 
     def stop(self):
-        if service_loaded():
-            sh("systemctl", "--user", "stop", SERVICE)
-        pid = board_pid()
-        if pid:
-            try:
-                os.kill(pid, signal.SIGTERM)
-            except OSError:
-                pass
+        stop_board(timeout=2.0)
 
     def open_settings(self):
         # In a systemd scope of its own, like the desktop launches apps: a plain child
@@ -229,7 +196,7 @@ class Tray:
         except urllib.error.HTTPError as e:
             if e.code not in (401, 403, 404) or not shutil.which("gh"):
                 raise
-        r = sh("gh", "api", f"repos/{REPO}/releases/latest", timeout=30)
+        r = run("gh", "api", f"repos/{REPO}/releases/latest", timeout=30)
         if r is None or r.returncode != 0:
             raise RuntimeError("private repository: run `gh auth login` once, or make it public")
         return json.loads(r.stdout), True
@@ -266,30 +233,16 @@ class Tray:
         return False
 
     def install_update(self):
+        """The packaged root helper fetches the release named by its tag from GitHub
+        itself and verifies the package against the digest GitHub publishes; this
+        process never downloads or hands over a file. Needs no password (polkit)."""
         tag, url, name, via_gh = self.update
-        cache = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "deckmate")
-        os.makedirs(cache, exist_ok=True)
-        path = os.path.join(cache, name)
+        if not os.path.exists(INSTALL_HELPER):        # a git checkout: no helper, no root
+            notify(f"Deckmate {tag} is available", f"Install the package by hand: {url}")
+            return
 
         def work():
-            try:
-                if via_gh:
-                    r = sh("gh", "release", "download", tag, "--repo", REPO, "--pattern", name,
-                           "--dir", cache, "--clobber", timeout=120)
-                    if r is None or r.returncode != 0:
-                        raise RuntimeError((r.stderr if r else "gh failed").strip()[-200:])
-                else:
-                    urllib.request.urlretrieve(url, path)
-            except Exception as e:
-                GLib.idle_add(notify, "Deckmate update failed", f"download: {e}")
-                return
-            # the packaged helper needs no password (polkit action); a git checkout
-            # falls back to apt-get, and pkexec asks for the password in a dialog
-            if os.path.exists(INSTALL_HELPER):
-                cmd = ["pkexec", INSTALL_HELPER, path]
-            else:
-                cmd = ["pkexec", "apt-get", "install", "-y", path]
-            r = subprocess.run(cmd, capture_output=True, text=True)
+            r = subprocess.run(["pkexec", INSTALL_HELPER, tag], capture_output=True, text=True)
             if r.returncode != 0:
                 GLib.idle_add(notify, "Deckmate update failed", (r.stderr or r.stdout).strip()[-300:])
                 return
@@ -299,7 +252,7 @@ class Tray:
     def after_update(self, tag):
         notify(f"Deckmate updated to {tag}", "Restarting the board.")
         if service_loaded():
-            sh("systemctl", "--user", "restart", SERVICE)
+            run("systemctl", "--user", "restart", SERVICE)
         os.execv(sys.executable, [sys.executable, os.path.abspath(__file__)])
         return False
 

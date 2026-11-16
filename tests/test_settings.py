@@ -30,6 +30,45 @@ class SetKeyTest(unittest.TestCase):
         self.assertEqual(cfg["keys"]["3"], {"type": "clock"})
         self.assertEqual(cfg["sessions"]["keys"], [5])
 
+    def test_every_kind_round_trips_and_loads(self):
+        import json
+        import tempfile
+        from settings import KEY_KINDS
+        from test_layout import isolate
+        from layout import load_board
+        with tempfile.TemporaryDirectory() as tmp:
+            isolate(self, tmp)
+            todo = {"file": os.path.join(tmp, "work.md"), "open_with": "code", "soon_days": 1, "hold_done": True}
+            for kind, _ in KEY_KINDS:
+                cfg = {"keys": {}}
+                set_key(cfg, 1, kind, label="T", color="#112233", run="true", team="T1", todo=todo,
+                        tiles=["tokens"], connection="Office")
+                self.assertEqual(key_kind(cfg, 1)[0], kind, kind)
+                path = os.path.join(tmp, "keys.json")
+                with open(path, "w") as f:
+                    json.dump(cfg, f)
+                keys, *_ = load_board(path)
+                cls = type(keys[1]).__name__
+                if kind == "empty":
+                    self.assertEqual(cls, "Blank", kind)
+                else:
+                    self.assertNotEqual(cls, "Blank", f"{kind} saved by the dialog loads as an empty key")
+
+    def test_resave_keeps_fields_the_dialog_does_not_show(self):
+        cfg = {"keys": {"1": {"type": "brightness", "steps": [20, 80]},
+                        "2": {"type": "media", "action": "next", "player": "chromium"}}}
+        set_key(cfg, 1, "brightness")
+        self.assertEqual(cfg["keys"]["1"]["steps"], [20, 80])
+        set_key(cfg, 2, "media_next")
+        self.assertEqual(cfg["keys"]["2"]["player"], "chromium")
+        set_key(cfg, 2, "clock")                      # a new type starts clean
+        self.assertEqual(cfg["keys"]["2"], {"type": "clock"})
+
+    def test_default_todo_file_stays_implicit(self):
+        cfg = {"keys": {}}
+        set_key(cfg, 3, "todo", todo={"open_with": "code", "soon_days": 0, "hold_done": True})
+        self.assertNotIn("file", cfg["keys"]["3"])
+
     def test_kind_and_summary(self):
         cfg = {"keys": {"1": {"type": "folder", "title": "Work", "keys": {}}, "2": {"title": "A", "run": "x"}}}
         self.assertEqual(key_kind(cfg, 1)[0], "folder")

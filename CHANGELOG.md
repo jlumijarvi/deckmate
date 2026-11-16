@@ -5,6 +5,13 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- Update helper: takes a release tag, fetches the release from GitHub itself
+  and verifies the package against GitHub's SHA-256 digest before installing;
+  the tray no longer downloads or hands over a file (#14).
+- Settings: re-saving a key keeps the fields its dialog does not show
+  (brightness steps, a volume step, the media player); a to-do key saved with
+  the default list file gets the sample list as documented.
+- Session key hold on a running session says "running, not hidden".
 - CI measures test coverage and the README shows it as a badge, next to the
   build status.
 - README: the update check no longer needs `gh`; the repository is public.

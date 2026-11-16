@@ -106,9 +106,6 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(elapsed_text(now - 90000, now), "1d")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class ActivityTest(unittest.TestCase):
     def test_texts(self):
@@ -145,3 +142,7 @@ class ActivityTest(unittest.TestCase):
             self.assertEqual(subagent_count(transcript), 2)
             self.assertEqual(subagent_count(os.path.join(tmp, "other.jsonl")), 0)
             self.assertEqual(subagent_count(""), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

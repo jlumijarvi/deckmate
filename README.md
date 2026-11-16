@@ -48,8 +48,11 @@ The top-bar icon checks GitHub every hour for a newer release and
 installs it on its own (switch "Install updates automatically" in the
 settings; off means it only offers the update in its menu). The install runs
 the root helper `/usr/lib/deckmate/install-update` through pkexec; the polkit
-action shipped with the package lets a logged-in user do that without a
-password, and the helper accepts nothing but a package named deckmate.
+action shipped with the package lets the user at the desktop do that without
+a password. The helper takes only a release tag: it fetches that release from
+GitHub itself, checks the package against the SHA-256 digest GitHub publishes
+for it, and installs nothing else, so no file a user hands in ever reaches
+root.
 
 ## The board service
 

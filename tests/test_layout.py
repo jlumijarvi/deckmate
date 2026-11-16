@@ -5,8 +5,11 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sessionkeys  # noqa: E402
+import statskeys  # noqa: E402
 from deckhid import KEY_COUNT, KEY_PX  # noqa: E402
 from layout import load_board  # noqa: E402
+from stats import Usage  # noqa: E402
 from pages import nav  # noqa: E402
 from sessionkeys import DismissedPage, PagerKey, SessionSlot  # noqa: E402
 from statskeys import StatsPage  # noqa: E402
@@ -41,9 +44,33 @@ def every_type(todo_file):
     }
 
 
+class FakeStats:
+    """Stands in for StatsProvider: no API call, no transcript scan, no threads."""
+
+    def __init__(self):
+        self.usage = Usage("/nonexistent", "/nonexistent")
+
+    def refresh(self):
+        self.usage.refresh()
+
+    def tokens(self):
+        return (0, 0, 0, 0)
+
+
+def isolate(test, tmp):
+    """Keep a test away from the account's own files: the stats provider and the
+    dismissed-sessions state file."""
+    statskeys._stats_provider = FakeStats()
+    test._state_file = sessionkeys.STATE_FILE
+    sessionkeys.STATE_FILE = os.path.join(tmp, "state.json")
+    test.addCleanup(setattr, sessionkeys, "STATE_FILE", test._state_file)
+    test.addCleanup(setattr, statskeys, "_stats_provider", None)
+
+
 class LayoutTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
+        isolate(self, self.tmp.name)
         self.todo = os.path.join(self.tmp.name, "todo.md")
         with open(self.todo, "w") as f:
             f.write("- [ ] First thing  @2026-01-01\n- [ ] Second [n](notes.md)\n- [x] Done\n")

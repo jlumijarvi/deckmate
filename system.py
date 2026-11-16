@@ -1,8 +1,17 @@
-"""Talking to the rest of the system: shell commands, detached launches, and
-which Linux account currently owns the screen."""
+"""Talking to the rest of the system: shell commands, detached launches, which
+Linux account currently owns the screen, and the board's own process (pid files,
+the login service), shared by the settings window and the tray icon."""
 import ctypes
 import ctypes.util
+import os
+import signal
 import subprocess
+import sys
+import time
+
+from paths import HERE, PID_FILE, TRAY_PID_FILE
+
+SERVICE = "deckmate.service"
 
 
 def sh(cmd):
@@ -44,3 +53,60 @@ def seat_active_uid():
     except (OSError, ValueError):
         pass
     return None
+
+
+# --- the board process ---------------------------------------------------------
+
+def run(*cmd, timeout=10):
+    """Run a command given as arguments, return the CompletedProcess or None."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def pid_from(path):
+    try:
+        with open(path) as f:
+            pid = int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+    return pid if os.path.exists(f"/proc/{pid}") else None
+
+
+def board_pid():
+    return pid_from(PID_FILE)
+
+
+def tray_pid():
+    return pid_from(TRAY_PID_FILE)
+
+
+def service_loaded():
+    """True when systemd knows a deckmate.service for this user (the package installs one)."""
+    r = run("systemctl", "--user", "show", SERVICE, "-p", "LoadState", "--value")
+    return bool(r) and r.stdout.strip() == "loaded"
+
+
+def start_board():
+    if service_loaded():
+        run("systemctl", "--user", "start", SERVICE)
+        return
+    subprocess.Popen([sys.executable, os.path.join(HERE, "deck.py")], cwd=HERE, start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def stop_board(timeout=5.0):
+    """Stop the service and the process, and wait up to timeout for it to be gone."""
+    pid = board_pid()
+    if service_loaded():
+        run("systemctl", "--user", "stop", SERVICE)
+    if pid is None:
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError:
+        return
+    end = time.monotonic() + timeout
+    while time.monotonic() < end and os.path.exists(f"/proc/{pid}"):
+        time.sleep(0.1)

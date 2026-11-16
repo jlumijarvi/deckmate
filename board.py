@@ -5,8 +5,7 @@ small state file that remembers dismissals.
 import json
 import os
 
-STATE_ORDER = {"waiting": 0, "running": 1, "done": 2, "stopped": 3, "failed": 4}
-FINISHED = ("done", "stopped", "failed")
+from sessions import STATE_ORDER
 
 
 class PressTracker:
