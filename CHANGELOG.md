@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.9.5 (2026-11-16)
 
 - Update helper: takes a release tag, fetches the release from GitHub itself
   and verifies the package against GitHub's SHA-256 digest before installing;
