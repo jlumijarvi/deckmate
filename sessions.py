@@ -84,9 +84,14 @@ def transcript_path(cwd, session_id):
     return hits[0] if hits else None
 
 
+OLD_GENERATION = re.compile(r"claude-(?:3-|(?:opus|sonnet|haiku)-4-[0-5]\b)")
+
+
 def context_window_for(model):
+    """Every current model has a 1M window; Haiku 4.5 and the 4.5-and-older
+    generation have 200k. An unknown model is taken as current."""
     m = (model or "").lower()
-    return 1_000_000 if any(t in m for t in ("fable", "mythos", "[1m]")) else 200_000
+    return 200_000 if OLD_GENERATION.search(m) else 1_000_000
 
 
 def _ts(entry):
@@ -134,7 +139,7 @@ def analyze_tail(lines):
 
     assistants = [e for e in turn if e.get("type") == "assistant"]
     result = {"state": "done", "waiting_kind": "", "since": None,
-              "ctx_used": 0, "ctx_window": 200_000, "model": None, "title": ai_title}
+              "ctx_used": 0, "ctx_window": 1_000_000, "model": None, "title": ai_title}
     if not assistants:
         # the person just sent something and no reply has been logged yet
         result["state"] = "running"

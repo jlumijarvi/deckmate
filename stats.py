@@ -1,45 +1,112 @@
-"""Data for the stats page: plan quota windows as the Claude desktop app last
-sampled them, and tokens used today across all transcripts. Read-only."""
+"""Data for the stats key and page: how much is left of the plan limits, and
+tokens used today across the transcripts on this account. Read-only.
+
+Limits come from Claude Code's own cache in ~/.claude.json
+(cachedUsageUtilization: session, weekly, and a weekly limit scoped to one
+model, each with the time the window resets). The Claude desktop app's
+~/.config/Claude/plan-usage-history.json is the fallback for session and week
+when it is the newer of the two; it is only written while that app runs.
+Both are undocumented files of those programs.
+"""
 import glob
 import json
 import os
 import threading
 import time
+from dataclasses import dataclass
 from datetime import datetime
 
+CLAUDE_JSON = os.path.expanduser("~/.claude.json")
 PLAN_USAGE = os.path.expanduser("~/.config/Claude/plan-usage-history.json")
 PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
-RESET_DROP = 20   # a used-percent drop larger than this between samples means a new window
+STALE_S = 30 * 60      # older data is shown greyed, with its age
 
 
-class PlanUsage:
-    """Latest five-hour (fh) and seven-day (sd) utilisation in percent, and whether
-    a window has just reset (used percent dropped by more than RESET_DROP)."""
+@dataclass
+class Limit:
+    name: str                 # session | week | scoped
+    label: str                # what the key says: session, week, or the model's name
+    used: int | None          # percent used
+    resets_at: float | None   # epoch seconds when the window ends
+    source: str               # "code" (Claude Code's cache) or "desktop" (the desktop app)
+    at: float | None          # epoch seconds when the number was sampled
 
-    def __init__(self, path=PLAN_USAGE):
+    @property
+    def left(self):
+        return None if self.used is None else max(0, 100 - int(self.used))
+
+
+def parse_iso(s):
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(str(s).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def parse_usage_cache(cache):
+    """Limits from Claude Code's cachedUsageUtilization: session, week, and the
+    first model-scoped weekly limit (labelled with the model's display name)."""
+    cache = cache or {}
+    ut = cache.get("utilization") or {}
+    at = (cache.get("fetchedAtMs") or 0) / 1000.0 or None
+    out = {}
+    for lim in ut.get("limits") or []:
+        if not isinstance(lim, dict):
+            continue
+        kind, pct, reset = lim.get("kind"), lim.get("percent"), parse_iso(lim.get("resets_at"))
+        if kind == "session":
+            out["session"] = Limit("session", "session", pct, reset, "code", at)
+        elif kind == "weekly_all":
+            out["week"] = Limit("week", "week", pct, reset, "code", at)
+        elif kind == "weekly_scoped" and "scoped" not in out:
+            model = ((lim.get("scope") or {}).get("model") or {}).get("display_name") or "model"
+            out["scoped"] = Limit("scoped", model, pct, reset, "code", at)
+    for name, key in (("session", "five_hour"), ("week", "seven_day")):   # older caches
+        v = ut.get(key)
+        if name not in out and isinstance(v, dict):
+            out[name] = Limit(name, name, v.get("utilization"), parse_iso(v.get("resets_at")), "code", at)
+    return out
+
+
+class CachedFile:
+    """A JSON file re-read only when its size or mtime changes; the last good
+    content is kept over a half-written one."""
+
+    def __init__(self, path):
         self.path = path
         self._key = None
-        self.fh = None
-        self.sd = None
-        self.sampled_at = None
-        self.new_window = {"fh": False, "sd": False}
-        self.reset_events = []   # window names whose reset was seen by the last refresh
+        self.data = None
 
-    def refresh(self):
-        self.reset_events = []
+    def read(self):
         try:
             st = os.stat(self.path)
         except OSError:
-            return
+            return self.data
         key = (st.st_size, st.st_mtime_ns)
         if key == self._key:
-            return
+            return self.data
         try:
             with open(self.path) as f:
-                data = json.load(f)
+                self.data = json.load(f)
+            self._key = key
         except (OSError, ValueError):
-            return
-        self._key = key
+            pass
+        return self.data
+
+
+class PlanUsage:
+    """The desktop app's samples: five-hour (fh) and seven-day (sd) percent used."""
+
+    def __init__(self, path=PLAN_USAGE):
+        self.file = CachedFile(path)
+        self.fh = None
+        self.sd = None
+        self.sampled_at = None
+
+    def refresh(self):
+        data = self.file.read()
         samples = data.get("samples") if isinstance(data, dict) else data
         if not samples:
             return
@@ -47,22 +114,91 @@ class PlanUsage:
 
     def apply(self, samples):
         last = samples[-1]
-        prev = samples[-2] if len(samples) > 1 else None
         u = last.get("u") or {}
-        fh, sd = u.get("fh"), u.get("sd")
-        for name, value in (("fh", fh), ("sd", sd)):
-            before = (prev.get("u") or {}).get(name) if prev else None
-            reset = before is not None and value is not None and before - value > RESET_DROP
-            if reset:
-                self.reset_events.append(name)
-            # the marker stays until the next sample arrives
-            self.new_window[name] = reset
-        self.fh, self.sd = fh, sd
+        self.fh, self.sd = u.get("fh"), u.get("sd")
         self.sampled_at = (last.get("t") or 0) / 1000.0 or None
 
+    def limit(self, name):
+        used = self.fh if name == "session" else self.sd
+        if used is None:
+            return None
+        return Limit(name, name, used, None, "desktop", self.sampled_at)
+
+
+def age_text(seconds):
+    if seconds is None:
+        return "no data"
+    if seconds < 90:
+        return "just now"
+    if seconds < 3600:
+        return f"{int(seconds // 60)} min"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)} h"
+    return f"{int(seconds // 86400)} d"
+
+
+class Usage:
+    """The limits as the board shows them: Claude Code's cache merged with the
+    desktop app's samples (newer wins for session and week), plus window resets
+    worked out from resets_at rather than guessed from a drop in the numbers."""
+
+    def __init__(self, cache_path=CLAUDE_JSON, desktop_path=PLAN_USAGE, clock=time.time):
+        self.cache = CachedFile(cache_path)
+        self.desktop = PlanUsage(desktop_path)
+        self.clock = clock
+        self.limits = {}          # name -> Limit
+        self.new_window = {}      # name -> True from the reset until newer data arrives
+        self.reset_events = []    # names whose window ended since the last refresh
+        self._window_end = {}     # name -> the resets_at last seen
+        self._started = False
+
+    def refresh(self):
+        self.reset_events = []
+        data = self.cache.read()
+        merged = parse_usage_cache((data or {}).get("cachedUsageUtilization") if isinstance(data, dict) else None)
+        self.desktop.refresh()
+        for name in ("session", "week"):
+            d = self.desktop.limit(name)
+            c = merged.get(name)
+            if d is not None and (c is None or (d.at or 0) > (c.at or 0)):
+                merged[name] = Limit(name, name, d.used, c.resets_at if c else None, "desktop", d.at)
+        now = self.clock()
+        for name, lim in merged.items():
+            end = self._window_end.get(name)
+            if lim.resets_at and (end is None or lim.resets_at > end):
+                if end is not None and self._started and not self.new_window.get(name):
+                    self.reset_events.append(name)      # a new window, seen in the data first
+                self._window_end[name] = end = lim.resets_at
+                self.new_window[name] = False
+            if end and now >= end and not self.new_window.get(name) and (lim.at or 0) < end:
+                self.new_window[name] = True             # the clock passed the end of the window
+                if self._started:
+                    self.reset_events.append(name)
+            if self.new_window.get(name) and lim.at and end and lim.at >= end:
+                self.new_window[name] = False            # fresh data from after the reset
+        self.limits = merged
+        self._started = True
+
     def left(self, name):
-        v = self.fh if name == "fh" else self.sd
-        return None if v is None else max(0, 100 - int(v))
+        lim = self.limits.get(name)
+        if lim is None:
+            return None
+        return 100 if self.new_window.get(name) else lim.left
+
+    def age(self, name):
+        lim = self.limits.get(name)
+        return None if lim is None or lim.at is None else max(0.0, self.clock() - lim.at)
+
+    def stale(self, name):
+        a = self.age(name)
+        return a is None or a > STALE_S
+
+    def reset_text(self, name):
+        lim = self.limits.get(name)
+        if lim is None or not lim.resets_at:
+            return ""
+        fmt = "%H:%M" if name == "session" else "%a %H:%M"
+        return time.strftime(fmt, time.localtime(lim.resets_at))
 
 
 def _local_midnight():
@@ -95,9 +231,11 @@ def parse_usage_line(line):
 
 
 class TokenTally:
-    """Tokens since local midnight across all transcripts. The transcript writes
-    one line per content block with the same usage repeated, so entries are
-    counted once per message id. Per-file read offsets make refreshes incremental."""
+    """Tokens since local midnight across all transcripts on this account,
+    subagent transcripts included (<project>/<session>/subagents/*.jsonl). The
+    transcript writes one line per content block with the same usage repeated,
+    so entries are counted once per message id. Per-file read offsets make
+    refreshes incremental."""
 
     def __init__(self, projects_dir=PROJECTS_DIR):
         self.projects_dir = projects_dir
@@ -118,7 +256,7 @@ class TokenTally:
     def refresh(self):
         if _local_midnight() != self.day_start:
             self.reset_day()
-        for path in glob.glob(os.path.join(self.projects_dir, "*", "*.jsonl")):
+        for path in glob.glob(os.path.join(self.projects_dir, "**", "*.jsonl"), recursive=True):
             try:
                 st = os.stat(path)
             except OSError:
@@ -174,11 +312,11 @@ class TokenTally:
 
 
 class StatsProvider:
-    """Board-side wrapper: plan usage checked every refresh (cheap stat), the
+    """Board-side wrapper: the limits checked every refresh (cheap stats), the
     token tally kept up to date by a background thread."""
 
     def __init__(self):
-        self.plan = PlanUsage()
+        self.usage = Usage()
         self.tally = TokenTally()
         self._lock = threading.Lock()
         self._snapshot = (0, 0, 0, 0)
@@ -197,7 +335,7 @@ class StatsProvider:
             time.sleep(2.0)
 
     def refresh(self):
-        self.plan.refresh()
+        self.usage.refresh()
 
     def tokens(self):
         with self._lock:

@@ -76,8 +76,16 @@ class ClassifyTest(unittest.TestCase):
         r = analyze_tail([human("hi"), asst([{"type": "text", "text": "x"}])])
         self.assertEqual(r["ctx_used"], 50402)
         self.assertEqual(r["ctx_window"], 1_000_000)
-        self.assertEqual(context_window_for("claude-opus-5-5"), 200_000)
+        self.assertEqual(context_window_for("claude-opus-5-5"), 1_000_000)
         self.assertEqual(context_window_for("claude-fable-5-1"), 1_000_000)
+        self.assertEqual(context_window_for("claude-opus-4-6"), 1_000_000)
+        self.assertEqual(context_window_for("claude-sonnet-4-6"), 1_000_000)
+        self.assertEqual(context_window_for("claude-haiku-4-5"), 200_000)
+        self.assertEqual(context_window_for("claude-haiku-4-5-20251001"), 200_000)
+        self.assertEqual(context_window_for("claude-sonnet-4-5"), 200_000)
+        self.assertEqual(context_window_for("claude-opus-4-5-20251101"), 200_000)
+        self.assertEqual(context_window_for("claude-3-7-sonnet-latest"), 200_000)
+        self.assertEqual(context_window_for(None), 1_000_000)
 
     def test_usage_past_200k_steps_up_to_1m(self):
         big = json.loads(asst([{"type": "text", "text": "x"}], model="claude-opus-5-5"))

@@ -31,7 +31,7 @@ def every_type(todo_file):
             "9": {"type": "todo", "file": todo_file, "soon_days": 2},
             "10": {"type": "counter", "state": "waiting"},
             "11": {"type": "counter", "state": "done"},
-            "12": {"type": "stats"},
+            "12": {"type": "stats", "tiles": ["tokens", "cache", "context", "bogus"]},
             "13": {"type": "pager", "dir": "prev"},
             "14": {"type": "pager", "dir": "next"},
             "99": {"type": "command"},
@@ -79,7 +79,8 @@ class LayoutTest(unittest.TestCase):
         keys, *_ = load_board(self.path)
         nav.reset(keys)
         board = next(k for k in keys if isinstance(k, SessionSlot)).board
-        for page in (StatsPage(board), DismissedPage(board), TodoPage(keys[9].todo, keys[9].cfg)):
+        for page in (StatsPage(board), StatsPage(board, keys[12].cfg["tiles"]), DismissedPage(board),
+                     TodoPage(keys[9].todo, keys[9].cfg)):
             page_keys = page.keys()
             self.assertEqual(len(page_keys), KEY_COUNT)
             self.render_all(page_keys)

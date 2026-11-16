@@ -72,7 +72,7 @@ KIND_HINT = {
     "pager_prev": "Previous page of sessions. Hold: hidden sessions",
     "pager_next": "Next page of sessions",
     "brightness": "Shows the deck's brightness; press steps it 30 / 60 / 100",
-    "stats": "Opens the stats page: plan quota, tokens today, cache reads, fullest context",
+    "stats": "What is left of the session, week and model limits; press opens the stats page",
 }
 
 
@@ -118,7 +118,7 @@ def key_kind(cfg, i):
     return "command", k
 
 
-def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None):
+def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None, tiles=None):
     keys = cfg.setdefault("keys", {})
     sess = [s for s in session_keys(cfg) if s != i]
     keys.pop(str(i), None)
@@ -133,7 +133,7 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
     elif kind == "todo":
         keys[str(i)] = {"type": "todo", **(todo or {})}
     elif kind == "stats":
-        keys[str(i)] = {"type": "stats"}
+        keys[str(i)] = {"type": "stats", **({"tiles": list(tiles)} if tiles else {})}
     elif kind == "brightness":
         keys[str(i)] = {"type": "brightness"}
     elif kind.startswith("counter_"):
@@ -374,6 +374,18 @@ class KeyDialog(Adw.Dialog):
         self.todo_hold.set_active(bool(k.get("hold_done", True)))
         group.add(self.todo_hold)
 
+        # stats page: optional tiles
+        self.stats_tiles = {}
+        on = set(k.get("tiles") or [])
+        for name, title, subtitle in (
+                ("tokens", "Tokens today tile", "Output and input tokens of this account's sessions since midnight"),
+                ("cache", "Cache reads tile", "Cache read tokens today and the number of replies"),
+                ("context", "Fullest context tile", "The session whose context window is fullest")):
+            row = Adw.SwitchRow(title=title, subtitle=subtitle)
+            row.set_active(name in on)
+            group.add(row)
+            self.stats_tiles[name] = row
+
         view = Adw.ToolbarView()
         header = Adw.HeaderBar()
         save = Gtk.Button(label="Save")
@@ -401,6 +413,8 @@ class KeyDialog(Adw.Dialog):
         self.team_row.set_visible(kind == "slack")
         for row in (self.todo_file, self.todo_open, self.todo_soon, self.todo_hold):
             row.set_visible(kind == "todo")
+        for row in self.stats_tiles.values():
+            row.set_visible(kind == "stats")
 
     def on_save(self, *_):
         rgba = self.color_btn.get_rgba()
@@ -414,8 +428,9 @@ class KeyDialog(Adw.Dialog):
             "hold_done": bool(self.todo_hold.get_active()),
             **({"title": label} if label.strip() else {}),
         }
+        tiles = [name for name, row in self.stats_tiles.items() if row.get_active()]
         set_key(self.window.cfg, self.index, self.kind(),
-                label=label, color=color, run=self.run_row.get_text(), team=team, todo=todo)
+                label=label, color=color, run=self.run_row.get_text(), team=team, todo=todo, tiles=tiles)
         self.window.save()
         self.window.refresh_grid()
         self.close()

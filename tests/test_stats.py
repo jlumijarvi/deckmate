@@ -6,29 +6,166 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from stats import PlanUsage, TokenTally, fmt_tokens  # noqa: E402
+from stats import PlanUsage, TokenTally, Usage, age_text, fmt_tokens, parse_usage_cache  # noqa: E402
+
+T0 = 1_800_000_000.0   # an arbitrary "now"
+
+
+def iso(t):
+    return datetime.fromtimestamp(t, timezone.utc).isoformat()
+
+
+def cache(session=10, week=40, fable=5, at=T0, session_reset=T0 + 3600, week_reset=T0 + 5 * 86400):
+    return {"cachedUsageUtilization": {"fetchedAtMs": int(at * 1000), "utilization": {
+        "five_hour": {"utilization": session, "resets_at": iso(session_reset)},
+        "seven_day": {"utilization": week, "resets_at": iso(week_reset)},
+        "limits": [
+            {"kind": "session", "group": "session", "percent": session, "resets_at": iso(session_reset)},
+            {"kind": "weekly_all", "group": "weekly", "percent": week, "resets_at": iso(week_reset)},
+            {"kind": "weekly_scoped", "group": "weekly", "percent": fable, "resets_at": iso(week_reset),
+             "scope": {"model": {"id": None, "display_name": "Fable"}, "surface": None}},
+        ]}}}
+
+
+class ParseTest(unittest.TestCase):
+    def test_limits(self):
+        lims = parse_usage_cache(cache()["cachedUsageUtilization"])
+        self.assertEqual(sorted(lims), ["scoped", "session", "week"])
+        self.assertEqual(lims["session"].left, 90)
+        self.assertEqual(lims["week"].left, 60)
+        self.assertEqual((lims["scoped"].label, lims["scoped"].left), ("Fable", 95))
+        self.assertAlmostEqual(lims["session"].resets_at, T0 + 3600)
+        self.assertAlmostEqual(lims["session"].at, T0)
+
+    def test_older_cache_without_limits_list(self):
+        c = cache()["cachedUsageUtilization"]
+        del c["utilization"]["limits"]
+        lims = parse_usage_cache(c)
+        self.assertEqual(sorted(lims), ["session", "week"])
+        self.assertEqual(lims["week"].left, 60)
+
+    def test_nothing(self):
+        self.assertEqual(parse_usage_cache(None), {})
+        self.assertEqual(parse_usage_cache({"utilization": {"limits": ["junk"]}}), {})
+
+
+class UsageTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cache_path = os.path.join(self.tmp.name, "claude.json")
+        self.desktop_path = os.path.join(self.tmp.name, "plan.json")
+        self.now = T0
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, path, data):
+        with open(path, "w") as f:
+            json.dump(data, f)
+        os.utime(path, (self.now, self.now))
+
+    def usage(self):
+        return Usage(self.cache_path, self.desktop_path, clock=lambda: self.now)
+
+    def test_reads_claude_code_cache(self):
+        self.write(self.cache_path, cache())
+        u = self.usage()
+        u.refresh()
+        self.assertEqual((u.left("session"), u.left("week"), u.left("scoped")), (90, 60, 95))
+        self.assertEqual(u.reset_events, [])
+        self.assertFalse(u.stale("session"))
+        self.assertEqual(u.limits["session"].source, "code")
+
+    def test_newer_desktop_sample_wins_for_session_and_week(self):
+        self.write(self.cache_path, cache(session=10, week=40, at=T0 - 7200))
+        self.write(self.desktop_path, {"samples": [{"t": int((T0 - 60) * 1000), "u": {"fh": 55, "sd": 42}}]})
+        u = self.usage()
+        u.refresh()
+        self.assertEqual((u.left("session"), u.left("week"), u.left("scoped")), (45, 58, 95))
+        self.assertEqual(u.limits["session"].source, "desktop")
+        self.assertAlmostEqual(u.limits["session"].resets_at, T0 + 3600)   # reset time kept from the cache
+
+    def test_no_reset_event_on_start_and_one_when_the_window_ends(self):
+        self.write(self.cache_path, cache(session_reset=T0 + 600))
+        u = self.usage()
+        u.refresh()
+        self.assertEqual(u.reset_events, [])
+        self.now = T0 + 300
+        u.refresh()
+        self.assertEqual(u.reset_events, [])
+        self.now = T0 + 601
+        u.refresh()
+        self.assertEqual(u.reset_events, ["session"])
+        self.assertTrue(u.new_window["session"])
+        self.assertEqual(u.left("session"), 100)
+        u.refresh()
+        self.assertEqual(u.reset_events, [])        # fires once
+        # fresh data from after the reset ends the "new window" state
+        self.now = T0 + 700
+        self.write(self.cache_path, cache(session=3, at=T0 + 650, session_reset=T0 + 650 + 18000))
+        u.refresh()
+        self.assertFalse(u.new_window["session"])
+        self.assertEqual(u.left("session"), 97)
+        self.assertEqual(u.reset_events, [])
+
+    def test_reset_seen_in_data_first_fires_once(self):
+        self.write(self.cache_path, cache(session_reset=T0 + 600))
+        u = self.usage()
+        u.refresh()
+        self.now = T0 + 100
+        self.write(self.cache_path, cache(session=1, at=T0 + 100, session_reset=T0 + 100 + 18000))
+        u.refresh()
+        self.assertEqual(u.reset_events, ["session"])
+        self.assertFalse(u.new_window["session"])
+
+    def test_stale_and_age(self):
+        self.write(self.cache_path, cache(at=T0 - 2 * 3600))
+        u = self.usage()
+        u.refresh()
+        self.assertTrue(u.stale("session"))
+        self.assertEqual(age_text(u.age("session")), "2 h")
+        self.assertEqual(u.reset_text("session"), datetime.fromtimestamp(T0 + 3600).strftime("%H:%M"))
+        self.assertEqual(u.reset_text("week"), datetime.fromtimestamp(T0 + 5 * 86400).strftime("%a %H:%M"))
+
+    def test_missing_files(self):
+        u = self.usage()
+        u.refresh()
+        self.assertEqual(u.limits, {})
+        self.assertIsNone(u.left("session"))
+        self.assertTrue(u.stale("session"))
+
+    def test_half_written_cache_keeps_the_last_values(self):
+        self.write(self.cache_path, cache())
+        u = self.usage()
+        u.refresh()
+        with open(self.cache_path, "w") as f:
+            f.write('{"cachedUsageUtilization": {"fetchedAt')
+        os.utime(self.cache_path, (self.now + 1, self.now + 1))
+        u.refresh()
+        self.assertEqual(u.left("week"), 60)
 
 
 class PlanUsageTest(unittest.TestCase):
-    def test_left_and_reset_detection(self):
+    def test_desktop_samples(self):
         p = PlanUsage("/nonexistent")
         p.apply([{"t": 1000, "u": {"fh": 60, "sd": 30}}, {"t": 2000, "u": {"fh": 70, "sd": 31}}])
-        self.assertEqual(p.left("fh"), 30)
-        self.assertEqual(p.left("sd"), 69)
-        self.assertEqual(p.reset_events, [])
-        self.assertFalse(p.new_window["fh"])
-        p.apply([{"t": 2000, "u": {"fh": 70, "sd": 31}}, {"t": 3000, "u": {"fh": 5, "sd": 31}}])
-        self.assertEqual(p.reset_events, ["fh"])
-        self.assertTrue(p.new_window["fh"])
-        self.assertFalse(p.new_window["sd"])
-        # the next sample clears the marker
-        p.apply([{"t": 3000, "u": {"fh": 5, "sd": 31}}, {"t": 4000, "u": {"fh": 8, "sd": 32}}])
-        self.assertFalse(p.new_window["fh"])
+        self.assertEqual(p.limit("session").left, 30)
+        self.assertEqual(p.limit("week").left, 69)
+        self.assertEqual(p.sampled_at, 2.0)
 
     def test_missing_file(self):
         p = PlanUsage("/nonexistent")
         p.refresh()
-        self.assertIsNone(p.left("fh"))
+        self.assertIsNone(p.limit("session"))
+
+
+class AgeTextTest(unittest.TestCase):
+    def test_texts(self):
+        self.assertEqual(age_text(None), "no data")
+        self.assertEqual(age_text(30), "just now")
+        self.assertEqual(age_text(600), "10 min")
+        self.assertEqual(age_text(7200), "2 h")
+        self.assertEqual(age_text(3 * 86400), "3 d")
 
 
 def line(mid, ts, tin=10, tout=5, cache=100, kind="assistant"):
@@ -44,8 +181,8 @@ class TokenTallyTest(unittest.TestCase):
         self.path = os.path.join(self.root, "proj", "s.jsonl")
         self.now = datetime.now().astimezone()
 
-    def write(self, lines, mode="w"):
-        with open(self.path, mode) as f:
+    def write(self, lines, mode="w", path=None):
+        with open(path or self.path, mode) as f:
             f.write("\n".join(lines) + "\n")
 
     def test_dedupe_by_message_id_and_today_only(self):
@@ -58,6 +195,16 @@ class TokenTallyTest(unittest.TestCase):
         self.assertEqual(t.tokens_out, 12)
         self.assertEqual(t.tokens_in, 20)
         self.assertEqual(t.cache_read, 200)
+
+    def test_subagent_transcripts_count(self):
+        self.write([line("m1", self.now)])
+        sub = os.path.join(self.root, "proj", "s", "subagents")
+        os.makedirs(sub)
+        self.write([line("a1", self.now, tout=11)], path=os.path.join(sub, "agent-1.jsonl"))
+        t = TokenTally(self.root)
+        t.refresh()
+        self.assertEqual(t.messages, 2)
+        self.assertEqual(t.tokens_out, 16)
 
     def test_incremental_read(self):
         self.write([line("m1", self.now)])

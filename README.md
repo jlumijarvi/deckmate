@@ -108,7 +108,7 @@ a plain button with a shell command, or a live key:
 | `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a folder (a set of keys with a back key top left) |
 | `counter` (`state`: waiting, running or done) | how many sessions are in that state | shows only that state: bright border on the counter, empty slots and the pager name the filter, and it clears itself when no session is in that state any more; hold on the done counter hides every done session |
 | `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page; hold shows hidden sessions. next: next page |
-| `stats` | percent left in the five-hour plan window | opens the stats page |
+| `stats` | percent left of the session, week and model limits, one row each | opens the stats page |
 
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
 sessions fill them. Titles that do not fit wrap and shrink
@@ -143,12 +143,21 @@ bottom-left corner, so they stand out from ordinary buttons.
 
 ### Stats page
 
-Opened by a `stats` key. Tiles: percent left in the five-hour and seven-day plan windows as the Claude
-desktop app last sampled them, tokens today (output large, input and cache
-writes small), cache reads today with the number of replies, and the fullest
-context among the sessions on the board. When a plan window resets the deck
-pulses cyan and the tile shows "new window" with a cyan border until the next
-sample.
+Opened by a `stats` key. The key itself shows what is left of the three plan
+limits (the five-hour session, the week, and the weekly limit of one model
+such as Fable), each as a percent and a bar, with the session's reset time
+bottom right. The page has one tile per limit with its reset time, and a
+"data" tile saying how old the numbers are and where they came from. Three
+more tiles can be turned on in the key's dialog: tokens today (output large,
+input and cache writes small), cache reads today with the number of replies,
+and the fullest context among the sessions on the board. Tokens are summed
+over every transcript on this account since local midnight, subagents
+included; they measure this account's activity, not the plan.
+
+The limits come from Claude Code's own cache, refreshed while Claude Code
+runs; the desktop app's file is used when it is newer. Numbers older than 30
+minutes are greyed and show their age. When a window's reset time passes the
+deck pulses cyan and the limit reads "new" until fresh numbers arrive.
 
 ## To-do list
 
@@ -227,7 +236,7 @@ is updated. Everything is read-only; nothing is sent anywhere.
 | Key | Source | When it breaks |
 | --- | --- | --- |
 | sessions, counters, pagers | `~/.claude/sessions/<pid>.json` (one per running Claude Code process: title, folder, busy or idle) and the transcript `~/.claude/projects/<folder>/<session>.jsonl`, whose last entries decide waiting / done / failed | a Claude Code update that changes either file's layout; sessions then show as done or vanish |
-| stats page, stats key | `~/.config/Claude/plan-usage-history.json`, written by the Claude desktop app when it is running; tokens are summed from the transcripts above since local midnight | the desktop app is closed (numbers go stale, the tile shows when they were sampled) or changes the file |
+| stats page, stats key | `cachedUsageUtilization` in `~/.claude.json`, Claude Code's own cache of the plan limits (session, week, per-model week, reset times), and `~/.config/Claude/plan-usage-history.json` from the desktop app when that is newer; tokens are summed from the transcripts above since local midnight | neither program has run lately (numbers grey out with their age) or changes its file |
 | slack | `root-state.json` under `~/snap/slack/`, `~/.config/Slack/` or the flatpak folder, which holds per-workspace unread totals (so a per-channel badge is not possible) | a Slack update that moves or restructures the file; the key shows "no data" |
 | media | the player's MPRIS properties on the session D-Bus (PlaybackStatus, Metadata), plus one https fetch per cover | the player is not running (the key says so) or drops MPRIS; Spotify leaves the artist empty for podcasts |
 | mute, volume | `wpctl` (PipeWire) | a system without PipeWire; the key shows "?" |

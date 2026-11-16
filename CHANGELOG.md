@@ -5,6 +5,17 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- Stats: the limits come from Claude Code's own cache (`~/.claude.json`),
+  with the desktop app's file as the fallback when it is newer; the key shows
+  session, week and the model-scoped weekly limit as three bars, the page one
+  tile per limit with its reset time plus a data-age tile; a window reset is
+  taken from its reset time, not guessed from a drop (no more cyan pulse on
+  every start); stale data is greyed with its age. The tokens, cache reads and
+  fullest-context tiles are switches in the stats key's dialog, off by
+  default (#9).
+- Context bars: every current model has a 1M window; only Haiku 4.5 and the
+  4.5-and-older generation are taken as 200k.
+- Tokens today also counts subagent transcripts.
 - Slack key: the @mentions line no longer overlaps the workspace name (#7).
 - Settings: launching the settings again raises the open window instead of
   opening another (#8).

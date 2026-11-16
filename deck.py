@@ -25,7 +25,8 @@ painted one last time, so it stays on the deck's screen instead of the stored im
 
   counter             "state" waiting | running | done: how many sessions; press filters
   pager               "dir" prev | next: pages of session slots; hold prev: hidden sessions
-  stats               the five-hour window left; press opens the stats page
+  stats               percent left of the session, week and model limits; press opens the
+                      stats page; "tiles": ["tokens", "cache", "context"] adds those tiles
 
 A "sessions" entry claims a list of keys for live Claude Code sessions, one per
 key, sorted waiting / running / done / stopped / failed. Press opens the session's
@@ -182,10 +183,10 @@ def main():
                 log.info(f"pulse: {sess.name} -> {state}")
             if hasattr(p, "pending_pulses"):
                 p.pending_pulses.clear()
-            plan = getattr(p, "plan", None)
-            if plan is not None and plan.reset_events:
+            usage = getattr(p, "usage", None)
+            if usage is not None and usage.reset_events:
                 effects.pulse(now, CYAN)
-                log.info(f"plan window reset: {', '.join(plan.reset_events)}")
+                log.info(f"limit window reset: {', '.join(usage.reset_events)}")
         if nav.dirty:
             nav.dirty = False
             sent = [None] * KEY_COUNT

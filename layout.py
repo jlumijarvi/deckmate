@@ -55,7 +55,7 @@ def load_board(path):
         elif isinstance(k, tuple) and k[0] == "stats":
             keys[i] = StatsKey(k[1], board)
     if board is not None:
-        providers.append(stats_provider())   # plan usage: watched for window resets (cyan pulse)
+        providers.append(stats_provider())   # limits: watched for window resets (cyan pulse)
     defaults = cfg.get("todo", {})           # optional board-wide defaults for todo keys
     lists = {}                               # one TodoList per file, shared by keys on the same file
     for i, k in enumerate(keys):
