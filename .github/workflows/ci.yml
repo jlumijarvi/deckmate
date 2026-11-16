@@ -20,16 +20,16 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends \
             python3-pil python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-gtk-3.0 \
-            gir1.2-ayatanaappindicator3-0.1 fonts-dejavu-core
+            gir1.2-ayatanaappindicator3-0.1 fonts-dejavu-core python3-coverage
 
       - name: Lint (ruff)
         run: pipx run ruff check .
 
       - name: Unit tests, with coverage
         run: |
-          pipx run coverage run -m unittest discover -s tests -v
-          pipx run coverage report
-          pipx run coverage json -o coverage-report.json
+          python3 -m coverage run -m unittest discover -s tests -v
+          python3 -m coverage report
+          python3 -m coverage json -o coverage-report.json
           PCT=$(python3 -c "import json; print(round(json.load(open('coverage-report.json'))['totals']['percent_covered']))")
           echo "COVERAGE=$PCT" >> "$GITHUB_ENV"
 
