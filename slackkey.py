@@ -68,12 +68,14 @@ class Slack(Key):
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=badge if not pressed else (0, 0, 0))
         box = f.getbbox(text)
         d.text((cx - w / 2, cy - (box[3] - box[1]) / 2 - box[1]), text, font=f, fill=(255, 255, 255))
-        lines, size = fit_lines(ws["name"], max_lines=1, sizes=(13, 12, 11, 10, 9))
+        # the name is a caption under the badge, not a title: small and quiet
+        lines, size = fit_lines(ws["name"], max_lines=1, sizes=(10, 9))
+        name_fg = (210, 200, 215) if not pressed else fg
         if mentions:   # mentions line in the middle, the name on the bottom edge
             d.text((6, 35), f"@{mentions}", font=font(12), fill=(255, 200, 80) if not pressed else fg)
-            draw_centered_lines(d, lines, fg, size=size, top=KEY_PX - size - 5)
+            draw_centered_lines(d, lines, name_fg, size=size, top=KEY_PX - size - 7, bold=False)
         else:
-            draw_centered_lines(d, lines, fg, size=size, top=KEY_PX - size - 16)
+            draw_centered_lines(d, lines, name_fg, size=size, top=KEY_PX - size - 14, bold=False)
         return img
 
     def press(self):
