@@ -1,5 +1,6 @@
 """Folders: a stack of pages opened on top of the main board, and the key
 that goes back or turns a page."""
+from deckhid import KEY_PX
 from keys import Key
 from render import draw_centered_lines, tile
 
@@ -61,6 +62,18 @@ class NavKey(Key):
             self.hold_action()
 
 
+class BackKey(NavKey):
+    """Key 0 of every folder and page: an arrow, no text. Press goes back one
+    level, hold goes to the main board."""
+
+    def render(self, pressed):
+        img, d, fg = tile((36, 36, 44), pressed)
+        cx, cy = KEY_PX / 2, KEY_PX / 2
+        # a left-pointing arrow: head and shaft
+        d.polygon([(cx - 18, cy), (cx - 4, cy - 12), (cx - 4, cy + 12)], fill=fg)
+        d.rectangle([cx - 6, cy - 4, cx + 18, cy + 4], fill=fg)
+        return img
+
+
 def back_key():
-    """Key 0 of every folder and page: press goes back one level, hold goes to the main board."""
-    return NavKey("<", "back", nav.pop, hold_action=nav.home)
+    return BackKey("", "", nav.pop, hold_action=nav.home)

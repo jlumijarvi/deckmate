@@ -114,7 +114,7 @@ class LayoutTest(unittest.TestCase):
         folder.press()
         inside = nav.keys()
         self.assertEqual(len(inside), KEY_COUNT)
-        self.assertEqual(type(inside[0]).__name__, "NavKey")
+        self.assertEqual(type(inside[0]).__name__, "BackKey")
         self.assertTrue(inside[0].holdable)
         self.assertEqual([type(k).__name__ for k in inside[1:6]],
                          ["Command", "Folder", "Blank", "CounterKey", "TodoKey"])
