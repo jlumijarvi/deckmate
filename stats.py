@@ -1,12 +1,14 @@
 """Data for the stats key and page: how much is left of the plan limits, and
 tokens used today across the transcripts on this account. Read-only.
 
-Limits come from Claude Code's own cache in ~/.claude.json
-(cachedUsageUtilization: session, weekly, and a weekly limit scoped to one
-model, each with the time the window resets). The Claude desktop app's
-~/.config/Claude/plan-usage-history.json is the fallback for session and week
-when it is the newer of the two; it is only written while that app runs.
-Both are undocumented files of those programs.
+Limits come, newest sample wins per limit, from three sources: the usage API
+Claude Code's own panel calls (claudeusage.py, every five minutes, with Claude
+Code's login token), Claude Code's cache in ~/.claude.json
+(cachedUsageUtilization, written now and then), and the Claude desktop app's
+~/.config/Claude/plan-usage-history.json (written while that app runs). Each
+gives session, weekly and a weekly limit scoped to one model, with the time
+the window resets. The files are undocumented; the API call is the one the
+official tool makes.
 """
 import glob
 import json
@@ -29,7 +31,7 @@ class Limit:
     label: str                # what the key says: session, week, or the model's name
     used: int | None          # percent used
     resets_at: float | None   # epoch seconds when the window ends
-    source: str               # "code" (Claude Code's cache) or "desktop" (the desktop app)
+    source: str               # "api" (live), "code" (Claude Code's cache) or "desktop" (the desktop app)
     at: float | None          # epoch seconds when the number was sampled
 
     @property
@@ -56,9 +58,10 @@ def parse_iso(s):
         return None
 
 
-def parse_usage_cache(cache):
-    """Limits from Claude Code's cachedUsageUtilization: session, week, and the
-    first model-scoped weekly limit (labelled with the model's display name)."""
+def parse_usage_cache(cache, source="code"):
+    """Limits from Claude Code's cachedUsageUtilization (or the API's reply wrapped
+    the same way): session, week, and the first model-scoped weekly limit
+    (labelled with the model's display name)."""
     cache = cache or {}
     ut = cache.get("utilization") or {}
     at = (cache.get("fetchedAtMs") or 0) / 1000.0 or None
@@ -68,16 +71,16 @@ def parse_usage_cache(cache):
             continue
         kind, pct, reset = lim.get("kind"), lim.get("percent"), parse_iso(lim.get("resets_at"))
         if kind == "session":
-            out["session"] = Limit("session", "session", pct, reset, "code", at)
+            out["session"] = Limit("session", "session", pct, reset, source, at)
         elif kind == "weekly_all":
-            out["week"] = Limit("week", "week", pct, reset, "code", at)
+            out["week"] = Limit("week", "week", pct, reset, source, at)
         elif kind == "weekly_scoped" and "scoped" not in out:
             model = ((lim.get("scope") or {}).get("model") or {}).get("display_name") or "model"
-            out["scoped"] = Limit("scoped", model, pct, reset, "code", at)
+            out["scoped"] = Limit("scoped", model, pct, reset, source, at)
     for name, key in (("session", "five_hour"), ("week", "seven_day")):   # older caches
         v = ut.get(key)
         if name not in out and isinstance(v, dict):
-            out[name] = Limit(name, name, v.get("utilization"), parse_iso(v.get("resets_at")), "code", at)
+            out[name] = Limit(name, name, v.get("utilization"), parse_iso(v.get("resets_at")), source, at)
     return out
 
 
@@ -149,13 +152,15 @@ def age_text(seconds):
 
 
 class Usage:
-    """The limits as the board shows them: Claude Code's cache merged with the
-    desktop app's samples (newer wins for session and week), plus window resets
-    worked out from resets_at rather than guessed from a drop in the numbers."""
+    """The limits as the board shows them: the live API, Claude Code's cache and
+    the desktop app's samples merged, the newest sample winning per limit, plus
+    window resets worked out from resets_at rather than guessed from a drop.
+    `live` is anything with a snapshot() -> (utilization dict, epoch) method."""
 
-    def __init__(self, cache_path=CLAUDE_JSON, desktop_path=PLAN_USAGE, clock=time.time):
+    def __init__(self, cache_path=CLAUDE_JSON, desktop_path=PLAN_USAGE, clock=time.time, live=None):
         self.cache = CachedFile(cache_path)
         self.desktop = PlanUsage(desktop_path)
+        self.live = live
         self.clock = clock
         self.limits = {}          # name -> Limit
         self.new_window = {}      # name -> True from the reset until newer data arrives
@@ -167,12 +172,17 @@ class Usage:
         self.reset_events = []
         data = self.cache.read()
         merged = parse_usage_cache((data or {}).get("cachedUsageUtilization") if isinstance(data, dict) else None)
+        if self.live is not None:
+            util, at = self.live.snapshot()
+            if util:
+                for name, lim in parse_usage_cache({"utilization": util, "fetchedAtMs": (at or 0) * 1000},
+                                                   source="api").items():
+                    self._take_if_newer(merged, name, lim)
         self.desktop.refresh()
         for name in ("session", "week"):
             d = self.desktop.limit(name)
-            c = merged.get(name)
-            if d is not None and (c is None or (d.at or 0) > (c.at or 0)):
-                merged[name] = Limit(name, name, d.used, c.resets_at if c else None, "desktop", d.at)
+            if d is not None:
+                self._take_if_newer(merged, name, d)
         now = self.clock()
         for name, lim in merged.items():
             end = self._window_end.get(name)
@@ -189,6 +199,16 @@ class Usage:
                 self.new_window[name] = False            # fresh data from after the reset
         self.limits = merged
         self._started = True
+
+    @staticmethod
+    def _take_if_newer(merged, name, lim):
+        """Newest sample wins; a reset time known from another source is kept."""
+        cur = merged.get(name)
+        if cur is not None and (cur.at or 0) >= (lim.at or 0):
+            return
+        if lim.resets_at is None and cur is not None and cur.resets_at and not lim.idle:
+            lim = Limit(lim.name, lim.label, lim.used, cur.resets_at, lim.source, lim.at)
+        merged[name] = lim
 
     def used(self, name):
         """Percent used as shown: 0 right after a window reset, until fresh numbers arrive."""
@@ -328,7 +348,9 @@ class StatsProvider:
     token tally kept up to date by a background thread."""
 
     def __init__(self):
-        self.usage = Usage()
+        from claudeusage import LiveUsage
+        self.live = LiveUsage()
+        self.usage = Usage(live=self.live)
         self.tally = TokenTally()
         self._lock = threading.Lock()
         self._snapshot = (0, 0, 0, 0)

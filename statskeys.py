@@ -125,8 +125,8 @@ class StatsPage:
         newest = max((lim for lim in usage.limits.values() if lim.at), key=lambda lim: lim.at, default=None)
         if newest is not None:
             age = usage.age(newest.name)
-            keys[n] = StatTile("Claude Code" if newest.source == "code" else "desktop app", age_text(age),
-                               GREY if usage.stale(newest.name) else (90, 110, 130), "data age")
+            title = {"api": "live", "code": "Claude Code", "desktop": "desktop app"}.get(newest.source, newest.source)
+            keys[n] = StatTile(title, age_text(age), GREY if usage.stale(newest.name) else (90, 110, 130), "data age")
             n += 1
         tin, tout, tcache, msgs = st.tokens()
         for name in self.tiles:

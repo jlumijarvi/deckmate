@@ -76,6 +76,25 @@ class UsageTest(unittest.TestCase):
         self.assertFalse(u.stale("session"))
         self.assertEqual(u.limits["session"].source, "code")
 
+    def test_live_api_wins_when_newest_and_keeps_fallbacks(self):
+        self.write(self.cache_path, cache(session=10, week=40, at=T0 - 600))
+
+        class Live:
+            def __init__(self, util, at):
+                self.util, self.at = util, at
+
+            def snapshot(self):
+                return self.util, self.at
+        live = Live(cache(session=33, week=26, fable=32)["cachedUsageUtilization"]["utilization"], T0 - 30)
+        u = Usage(self.cache_path, self.desktop_path, clock=lambda: self.now, live=live)
+        u.refresh()
+        self.assertEqual((u.used("session"), u.used("week"), u.used("scoped")), (33, 26, 32))
+        self.assertEqual(u.limits["session"].source, "api")
+        live.util = None                         # the call stopped working: the cache carries on
+        u.refresh()
+        self.assertEqual(u.used("session"), 10)
+        self.assertEqual(u.limits["session"].source, "code")
+
     def test_newer_desktop_sample_wins_for_session_and_week(self):
         self.write(self.cache_path, cache(session=10, week=40, at=T0 - 7200))
         self.write(self.desktop_path, {"samples": [{"t": int((T0 - 60) * 1000), "u": {"fh": 55, "sd": 42}}]})

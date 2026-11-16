@@ -5,6 +5,9 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- Stats: the limits come live from Anthropic's usage API, the call Claude
+  Code's own panel makes, every five minutes with Claude Code's login token;
+  the file caches are fallbacks. The session limit is right again.
 - Stats: the limits show percent used, as Claude Code's usage panel does, not
   percent left; amber from 75%, red from 90%.
 

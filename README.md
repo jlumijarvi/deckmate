@@ -175,12 +175,16 @@ and the fullest context among the sessions on the board. Tokens are summed
 over every transcript on this account since local midnight, subagents
 included; they measure this account's activity, not the plan.
 
-The limits come from Claude Code's own cache, refreshed while Claude Code
-runs, at its own irregular pace; the desktop app's file is used when it is
-newer. The key shows the numbers' age once they are over ten minutes old and
-greys them after two hours. A session limit the source reports without a
-window (nothing used, no reset time) shows as "—", since Claude Code's cache
-says that even mid-session. When a window's reset time passes the
+The numbers are the ones Claude Code's own usage panel shows: Deckmate makes
+the same call to Anthropic's usage API every five minutes, with the login
+token Claude Code keeps in `~/.claude/.credentials.json`. The token is sent to
+api.anthropic.com and nowhere else, the call reports percentages and is not a
+model request, so it uses no plan quota. Without a login, or while the call
+fails, the key falls back to Claude Code's own cache in `~/.claude.json` and
+the desktop app's file, whichever is newer; those lag, and the cache reports
+the session limit without a window even mid-session, which shows as "—".
+The key shows the numbers' age once they are over ten minutes old and greys
+them after two hours. When a window's reset time passes the
 deck pulses cyan and the limit reads "new" (0% used) until fresh numbers arrive.
 
 ## To-do list
@@ -260,7 +264,7 @@ is updated. Everything is read-only; nothing is sent anywhere.
 | Key | Source | When it breaks |
 | --- | --- | --- |
 | sessions, counters, pagers | `~/.claude/sessions/<pid>.json` (one per running Claude Code process: title, folder, busy or idle) and the transcript `~/.claude/projects/<folder>/<session>.jsonl`, whose last entries decide waiting / done / failed | a Claude Code update that changes either file's layout; sessions then show as done or vanish |
-| stats page, stats key | `cachedUsageUtilization` in `~/.claude.json`, Claude Code's own cache of the plan limits (session, week, per-model week, reset times), and `~/.config/Claude/plan-usage-history.json` from the desktop app when that is newer; tokens are summed from the transcripts above since local midnight | neither program has run lately (numbers grey out with their age) or changes its file |
+| stats page, stats key | Anthropic's usage API (`/api/oauth/usage`, the call Claude Code's panel makes) with the login token from `~/.claude/.credentials.json`; fallbacks: `cachedUsageUtilization` in `~/.claude.json` and `~/.config/Claude/plan-usage-history.json` from the desktop app, newest wins; tokens are summed from the transcripts above since local midnight | no login or the call fails (the fallbacks lag and grey out with their age), or the token file or API reply changes shape |
 | slack | `root-state.json` under `~/snap/slack/`, `~/.config/Slack/` or the flatpak folder, which holds per-workspace unread totals (so a per-channel badge is not possible) | a Slack update that moves or restructures the file; the key shows "no data" |
 | media | the player's MPRIS properties on the session D-Bus (PlaybackStatus, Metadata), plus one https fetch per cover | the player is not running (the key says so) or drops MPRIS; Spotify leaves the artist empty for podcasts |
 | vpn | `nmcli connection show`, polled once a second; NetworkManager lets the user at the active seat switch connections without a password | a VPN set up outside NetworkManager (OpenVPN by hand, Tailscale) is not seen; the key then says "not found" |
