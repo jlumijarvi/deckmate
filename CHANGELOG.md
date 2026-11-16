@@ -5,6 +5,9 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- When another account takes the screen, the board leaves the screen saver on
+  the deck before letting go, so the login screen no longer shows the last
+  board's keys.
 - Stats: no false "new window" pulse when two sources report the same reset
   time a second apart.
 

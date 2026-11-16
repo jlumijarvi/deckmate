@@ -94,6 +94,24 @@ def open_deck():
     return deck
 
 
+def leave_deck(deck, saver):
+    """Let go of the deck the way a stopped board does: leave the screen saver on
+    it (the clock without its time, or the picture), or the stored image when
+    there is no saver, so the deck never sits showing a dead board. Then close."""
+    try:
+        if saver.enabled and saver.is_tiles:
+            deck.fill_color(0, 0, 0)
+            for i, img in enumerate(saver.render_tiles(final=True)):
+                deck.set_key_image(i, img)
+        elif saver.enabled:
+            deck.set_screen_image(saver.render(final=True))
+        else:
+            deck.reset()
+    except OSError:
+        pass
+    deck.close()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--config", default=None,
@@ -237,7 +255,7 @@ def main():
                     log.info("another account is active, releasing the deck")
                     seat_paused = True
                     if deck is not None:
-                        deck.close()
+                        leave_deck(deck, saver)    # the login screen would otherwise keep showing our keys
                         deck = None
                 elif seat_paused and not inactive:
                     log.info("this account is active again")
@@ -373,18 +391,7 @@ def main():
         pass
     finally:
         if deck is not None:
-            try:
-                if saver.enabled and saver.is_tiles:
-                    deck.fill_color(0, 0, 0)
-                    for i, img in enumerate(saver.render_tiles(final=True)):
-                        deck.set_key_image(i, img)
-                elif saver.enabled:
-                    deck.set_screen_image(saver.render(final=True))
-                else:
-                    deck.reset()
-            except OSError:
-                pass
-            deck.close()
+            leave_deck(deck, saver)
         for f in (PID_FILE, STATUS_FILE):
             try:
                 os.remove(f)
