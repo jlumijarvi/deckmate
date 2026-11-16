@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.9.1 (2026-11-16)
 
 - Slack key: the workspace name is a small caption under the badge instead of
   a title-sized label.
