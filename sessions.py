@@ -42,6 +42,8 @@ class Session:
     ctx_used: int
     ctx_window: int
     transcript: str
+    activity: str = ""    # what it is doing or asking: "Bash: run tests", "? Approve plan"
+    agents: int = 0       # subagents writing transcripts right now
 
     @property
     def sort_key(self):
@@ -114,6 +116,45 @@ def _is_human_message(entry):
     return any(b.get("type") == "text" for b in content or [])
 
 
+FILE_TOOLS = {"Read", "Edit", "Write", "NotebookEdit"}
+SUBAGENT_ACTIVE_S = 60
+
+
+def activity_text(name, inp):
+    """A few words for a tool call: what it does, or what it asks."""
+    inp = inp if isinstance(inp, dict) else {}
+    if name == "AskUserQuestion":
+        qs = inp.get("questions") or []
+        header = (qs[0].get("header") if qs and isinstance(qs[0], dict) else "") or ""
+        return header or "question"
+    if name == "ExitPlanMode":
+        return "approve plan"
+    if name in FILE_TOOLS:
+        path = str(inp.get("file_path") or "")
+        return f"{name} {os.path.basename(path)}".strip()
+    if name.startswith("mcp__"):
+        name = name.rsplit("__", 1)[-1]
+    desc = str(inp.get("description") or "").strip()
+    return desc or name
+
+
+def subagent_count(transcript, now=None):
+    """Subagent transcripts of this session written in the last minute:
+    <project>/<session id>/subagents/agent-*.jsonl."""
+    if not transcript or not transcript.endswith(".jsonl"):
+        return 0
+    folder = os.path.join(transcript[:-len(".jsonl")], "subagents")
+    now = now or time.time()
+    n = 0
+    for path in glob.glob(os.path.join(folder, "agent-*.jsonl")):
+        try:
+            if now - os.path.getmtime(path) < SUBAGENT_ACTIVE_S:
+                n += 1
+        except OSError:
+            pass
+    return n
+
+
 def analyze_tail(lines):
     """Classify the current turn from transcript lines. Returns a dict."""
     conv = []
@@ -138,7 +179,7 @@ def analyze_tail(lines):
     turn = conv[start:]
 
     assistants = [e for e in turn if e.get("type") == "assistant"]
-    result = {"state": "done", "waiting_kind": "", "since": None,
+    result = {"state": "done", "waiting_kind": "", "since": None, "activity": "",
               "ctx_used": 0, "ctx_window": 1_000_000, "model": None, "title": ai_title}
     if not assistants:
         # the person just sent something and no reply has been logged yet
@@ -174,17 +215,19 @@ def analyze_tail(lines):
         if e.get("type") == "assistant":
             for b in content:
                 if b.get("type") == "tool_use":
-                    pending[b.get("id")] = b.get("name", "")
+                    pending[b.get("id")] = (b.get("name", ""), b.get("input"))
         else:
             for b in content:
                 if b.get("type") == "tool_result":
                     pending.pop(b.get("tool_use_id"), None)
     if pending:
-        names = list(pending.values())
+        names = [n for n, _ in pending.values()]
         result["state"] = "waiting"
         result["waiting_kind"] = "?" if any(n in QUESTION_TOOLS or n.endswith("wrap_up") for n in names) else "!"
         # the question was asked when the last block of the last message was written
         result["since"] = _ts(last)
+        name, inp = list(pending.values())[-1]      # the call still open: what runs, or what is asked
+        result["activity"] = activity_text(name, inp)
     return result
 
 
@@ -240,15 +283,19 @@ class SessionScanner:
             name = name or os.path.basename(cwd) or session_id[:8]
 
             alive = is_alive(pid, reg.get("procStart"))
+            activity, agents = "", 0
             if not alive:
                 state, kind = "stopped", ""
                 since = os.path.getmtime(path)
             elif reg.get("status") == "busy":
                 state, kind = "running", ""
                 since = (reg.get("statusUpdatedAt") or reg.get("updatedAt") or 0) / 1000.0
+                activity = info["activity"] if info else ""
+                agents = subagent_count(transcript)
             elif info:
                 state, kind = info["state"], info["waiting_kind"]
                 since = info["since"] or (reg.get("statusUpdatedAt") or 0) / 1000.0
+                activity = info["activity"] if state == "waiting" else ""
             else:
                 state, kind = "done", ""
                 since = (reg.get("statusUpdatedAt") or 0) / 1000.0
@@ -257,8 +304,8 @@ class SessionScanner:
                 pid=pid, session_id=session_id, name=name, cwd=cwd,
                 state=state, waiting_kind=kind, since=since or time.time(),
                 ctx_used=info["ctx_used"] if info else 0,
-                ctx_window=info["ctx_window"] if info else 200_000,
-                transcript=transcript or "",
+                ctx_window=info["ctx_window"] if info else 1_000_000,
+                transcript=transcript or "", activity=activity, agents=agents,
             ))
         sessions.sort(key=lambda s: s.sort_key)
         return sessions
@@ -279,5 +326,6 @@ def elapsed_text(since, now=None):
 if __name__ == "__main__":
     for s in SessionScanner().scan():
         pct = int(round(100 * s.ctx_fraction))
+        extra = f"{s.agents} agents" if s.agents else s.activity
         print(f"{s.state:8s} {s.waiting_kind or ' '} {elapsed_text(s.since):>6s}  {s.name:30s} "
-              f"ctx {pct:3d}%  pid {s.pid}  {s.cwd}")
+              f"ctx {pct:3d}%  pid {s.pid}  {s.cwd}  {extra}")

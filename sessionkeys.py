@@ -28,13 +28,14 @@ DEMO = False
 def demo_sessions():
     now = time.time()
     phase = int(time.monotonic() // 10) % 3   # the first session cycles running -> done -> waiting
-    mk = lambda name, state, kind, ago, ctx: Session(
+    mk = lambda name, state, kind, ago, ctx, activity="", agents=0: Session(
         pid=0, session_id="demo-" + name, name=name, cwd="", state=state, waiting_kind=kind,
-        since=now - ago, ctx_used=ctx, ctx_window=1_000_000, transcript="")
+        since=now - ago, ctx_used=ctx, ctx_window=1_000_000, transcript="", activity=activity, agents=agents)
     return sorted([
-        mk("Web MIDI synth editor", ("running", "done", "waiting")[phase], ("", "", "!")[phase], 95, 240_000),
-        mk("Invoice service remaining work", "waiting", "?", 12, 610_000),
-        mk("Deckmate project overview", "running", "", 240, 120_000),
+        mk("Web MIDI synth editor", ("running", "done", "waiting")[phase], ("", "", "!")[phase], 95, 240_000,
+           ("Run the unit tests", "", "Run the unit tests")[phase]),
+        mk("Invoice service remaining work", "waiting", "?", 12, 610_000, "Approach"),
+        mk("Deckmate project overview", "running", "", 240, 120_000, "Edit deck.py", agents=3),
         mk("Laptop migration to Ubuntu", "done", "", 4000, 900_000),
         mk("blog", "stopped", "", 90000, 50_000),
         mk("garage-sale", "failed", "", 700, 300_000),
@@ -89,14 +90,23 @@ class SessionBoard:
 
 
 def title_layout(name):
-    """(lines, size) for a static title, or None when it should scroll instead:
-    anything that needs more than two lines or less than 11 px."""
-    lines, size = fit_lines(name, max_lines=2, sizes=(13, 12, 11))
+    """(lines, size) for a static one-line title, or None when it should scroll
+    instead: anything that does not fit on one line at 11 px or more."""
+    lines, size = fit_lines(name, max_lines=1, sizes=(13, 12, 11))
     f = font(size)
     truncated = lines and lines[-1].endswith("…") and not name.endswith("…")
-    if not truncated and len(lines) <= 2 and all(f.getlength(line) <= KEY_PX - 6 for line in lines):
+    if not truncated and len(lines) == 1 and f.getlength(lines[0]) <= KEY_PX - 6:
         return lines, size
     return None
+
+
+def activity_line(s):
+    """The second line: subagents while running, else what the session does or asks."""
+    if s.state == "running" and s.agents:
+        return f"{s.agents} agent" + ("s" if s.agents != 1 else "")
+    if s.state in ("running", "waiting"):
+        return s.activity
+    return ""
 
 
 _title_strips = {}
@@ -145,13 +155,18 @@ def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None, f
     layout = title_layout(s.name)
     if layout is not None:
         lines, size = layout
-        draw_centered_lines(d, lines, title_fg, size=size, top=21 if len(lines) > 1 else 29)
+        draw_centered_lines(d, lines, title_fg, size=size, top=22)
     else:
         strip, w = title_strip(s.name)
         off = scroll_offset(scroll_t, w, KEY_PX - 6, speed=SCROLL_PX_S)
         view = strip.crop((off, 0, off + KEY_PX - 6, strip.height))
         tinted = Image.new("RGB", view.size, title_fg)
-        img.paste(tinted, (3, 29), view)
+        img.paste(tinted, (3, 22), view)
+    activity = activity_line(s)
+    if activity and not hidden:
+        lines, size = fit_lines(activity, max_lines=1, sizes=(10, 9), width=KEY_PX - 6)
+        act_fg = fg if pressed else color if s.state == "waiting" else (190, 190, 200)
+        draw_centered_lines(d, lines, act_fg, size=size, top=40, bold=False)
     frac = s.ctx_fraction
     bar = (110, 110, 110) if frac < 0.6 else (245, 166, 35) if frac < 0.85 else (220, 60, 60)
     d.rectangle([0, KEY_PX - 3, KEY_PX, KEY_PX], fill=(30, 30, 30))

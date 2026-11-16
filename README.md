@@ -123,8 +123,10 @@ amber for a session that waits for you (`!` for a permission prompt, `?` for a
 question or plan approval), blue and slowly breathing while it works, green
 when the last turn finished, grey when the process is gone, red after an API
 error. The key also shows how long the session has been in that state, the
-session title (scrolling when it does not fit), and a bar along the bottom
-with how full the context window is. A small git dot bottom right appears
+session title on one line (scrolling when it does not fit), a second line
+with what the session is doing or asking (the tool and its description, the
+question's header, "approve plan", or "3 agents" while subagents run), and a
+bar along the bottom with how full the context window is. A small git dot bottom right appears
 when the session's folder is a repository: hollow for a dirty worktree,
 filled for clean but ahead of upstream.
 

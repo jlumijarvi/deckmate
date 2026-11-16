@@ -5,6 +5,9 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- Session keys: the title is one line and a second line says what the session
+  is doing or asking: the tool and its description, the question's header,
+  "approve plan", or how many subagents are running (#12).
 - New `vpn` key type: a NetworkManager VPN connection, on or off at a glance,
   press switches it (#10).
 - Stats: the limits come from Claude Code's own cache (`~/.claude.json`),

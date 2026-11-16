@@ -108,3 +108,40 @@ class ClassifyTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ActivityTest(unittest.TestCase):
+    def test_texts(self):
+        from sessions import activity_text
+        self.assertEqual(activity_text("Bash", {"command": "ls", "description": "List files"}), "List files")
+        self.assertEqual(activity_text("Bash", {"command": "ls"}), "Bash")
+        self.assertEqual(activity_text("AskUserQuestion", {"questions": [{"header": "Prev pager"}]}), "Prev pager")
+        self.assertEqual(activity_text("AskUserQuestion", {}), "question")
+        self.assertEqual(activity_text("ExitPlanMode", {}), "approve plan")
+        self.assertEqual(activity_text("Edit", {"file_path": "/a/b/deck.py"}), "Edit deck.py")
+        self.assertEqual(activity_text("mcp__claude_ai_Gmail__send_message", {}), "send_message")
+        self.assertEqual(activity_text("Agent", {"description": "Find callers"}), "Find callers")
+        self.assertEqual(activity_text("Weird", None), "Weird")
+
+    def test_pending_call_sets_the_activity(self):
+        call = {"type": "tool_use", "id": "t1", "name": "Bash", "input": {"description": "Run tests"}}
+        r = analyze_tail([human("do"), asst([call])])
+        self.assertEqual((r["state"], r["activity"]), ("waiting", "Run tests"))
+        r = analyze_tail([human("do"), asst([call]), result("t1"), asst([{"type": "text", "text": "ok"}], mid="m2")])
+        self.assertEqual((r["state"], r["activity"]), ("done", ""))
+
+    def test_subagent_count(self):
+        import tempfile
+        import time
+        from sessions import subagent_count
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = os.path.join(tmp, "sess.jsonl")
+            sub = os.path.join(tmp, "sess", "subagents")
+            os.makedirs(sub)
+            for name, age in (("agent-a.jsonl", 5), ("agent-b.jsonl", 30), ("agent-old.jsonl", 600)):
+                p = os.path.join(sub, name)
+                open(p, "w").close()
+                os.utime(p, (time.time() - age, time.time() - age))
+            self.assertEqual(subagent_count(transcript), 2)
+            self.assertEqual(subagent_count(os.path.join(tmp, "other.jsonl")), 0)
+            self.assertEqual(subagent_count(""), 0)
