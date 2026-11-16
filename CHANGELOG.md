@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.9.4 (2026-11-16)
 
 - When another account takes the screen, the board leaves the screen saver on
   the deck before letting go, so the login screen no longer shows the last
