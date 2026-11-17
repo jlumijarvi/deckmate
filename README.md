@@ -116,7 +116,7 @@ a plain button with a shell command, or a live key:
 | `slack` | workspace name and a badge with the number of conversations that have unread messages: red when any are mentions or DMs (plus `@n`), blue otherwise, like Slack's own icon | opens that workspace in Slack |
 | `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a folder (a set of keys with a back key top left) |
 | `counter` (`state`: waiting, running or done) | how many sessions are in that state | shows only that state: bright border on the counter, empty slots and the pager name the filter, and it clears itself when no session is in that state any more; hold on the done counter hides every done session |
-| `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page; hold shows hidden sessions. next: next page |
+| `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page; hold shows hidden sessions. next: next page; hold starts pin mode (five seconds in which pressing a session key pins or unpins it) |
 | `stats` | percent used of the session, week and model limits, one row each, like Claude Code's usage panel | opens the stats page |
 
 `sessions.keys` lists the keys given to Claude Code sessions, in the order
@@ -163,6 +163,14 @@ state sweeps a band of its new colour across the deck.
 When there are more sessions than slots, the pager keys turn pages. The
 counters show how many sessions are in each state and filter the board to one
 state when pressed.
+
+Holding the next-page key starts *pin mode*: for five seconds every session
+key wears a white frame, and pressing one pins it (a star top left) or
+unpins it. A pinned session sorts first, cannot be hidden (holding its key
+unpins it instead), and stays on the board after its Claude Code process has
+ended, greyed and marked "gone", so a press still opens its folder in VS Code
+where the session can be resumed from Claude Code's panel. Pins are kept in
+`~/.config/deckmate/state.json`, with the session's title and folder.
 
 Every key that is about Claude Code (session slots, the counters, the pagers,
 the stats key and the stats tiles) wears a small orange `>_` in its

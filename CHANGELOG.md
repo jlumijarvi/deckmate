@@ -3,6 +3,13 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Pinned sessions (#5): hold the next-page key for pin mode, then press a
+  session key to pin or unpin it. A pinned session wears a star, sorts first,
+  cannot be hidden (its hold unpins instead) and stays on the board as "gone"
+  after its process has ended, so its folder is still one press away.
+
 ## 0.10.3 (2026-11-17)
 
 - Tray icon: when Deckmate is updated by other means than the tray itself

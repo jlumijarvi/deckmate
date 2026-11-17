@@ -177,7 +177,7 @@ class LayoutTest(unittest.TestCase):
     def test_brightness_key_writes_to_the_layout_not_the_todo_file(self):
         keys, *_ = load_board(self.path)
         self.assertEqual(keys[8].level, 60)
-        self.assertFalse(keys[14].holdable)    # the next pager has no hold any more
+        self.assertTrue(keys[14].holdable)     # the next pager's hold is pin mode, not brightness
         with open(self.todo) as f:
             todo_before = f.read()
         keys[8].press()    # 60 -> 80 with the key's own steps

@@ -106,6 +106,8 @@ def activity_line(s):
         return f"{s.agents} agent" + ("s" if s.agents != 1 else "")
     if s.state in ("running", "waiting"):
         return s.activity
+    if s.state == "gone":
+        return "gone"
     return ""
 
 
@@ -128,9 +130,14 @@ def title_scrolls(name):
     return title_layout(name) is None
 
 
-def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None, filter=None):
+PIN = "★"
+
+
+def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None, filter=None, pinned=False,
+                   pin_mode=False):
     """The key image for one session (None -> empty slot, which names the filter
-    when one is on so the empty board explains itself)."""
+    when one is on so the empty board explains itself). A pinned session wears a
+    star top left; in pin mode every session key gets a white frame."""
     if s is None:
         img = Image.new("RGB", (KEY_PX, KEY_PX), (12, 12, 14))
         if filter:
@@ -146,8 +153,12 @@ def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None, f
     if not pressed:
         d.rectangle([0, 0, KEY_PX, 4], fill=dim(color, 0.5) if hidden else color)
     info = font(11)
+    x = 4
+    if pinned:
+        d.text((x, 5), PIN, font=font(12), fill=(255, 215, 90) if not pressed else fg)
+        x += 15
     if s.waiting_kind:
-        d.text((4, 6), s.waiting_kind, font=font(13), fill=color if not pressed else fg)
+        d.text((x, 6), s.waiting_kind, font=font(13), fill=color if not pressed else fg)
     t = elapsed_text(s.since)
     d.text((KEY_PX - 4 - d.textlength(t, font=info), 7), t, font=info,
            fill=(200, 200, 200) if not pressed else fg)
@@ -179,6 +190,8 @@ def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None, f
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(200, 200, 210) if kind == "filled" else None,
                   outline=(200, 200, 210), width=1)
     code_mark(d, pressed)
+    if pin_mode and not pressed:
+        d.rectangle([0, 0, KEY_PX - 1, KEY_PX - 1], outline=(255, 255, 255), width=2)
     return img
 
 
@@ -191,6 +204,7 @@ class SessionSlot(Key):
         self.board = board
         self.index = index
         self.dismissed_ok = False
+        self.unpinned = False
 
     @property
     def session(self):
@@ -198,26 +212,46 @@ class SessionSlot(Key):
 
     def render(self, pressed):
         s = self.session
-        if s is None:
-            return render_session(None, pressed, filter=self.board.view.filter)
+        v = self.board.view
         now = time.monotonic()
+        if s is None:
+            return render_session(None, pressed, filter=v.filter)
         return render_session(s, pressed, scroll_t=now - self.board.first_seen.get(s.session_id, now), now=now,
-                              git=self.board.git.state(s.cwd))
+                              git=self.board.git.state(s.cwd), pinned=v.is_pinned(s), pin_mode=v.pin_mode(now))
 
     def press(self):
         s = self.session
+        v = self.board.view
+        if v.pin_mode(time.monotonic()):
+            if s is not None:
+                pinned = v.toggle_pin(s)
+                log.info(f"{'pinned' if pinned else 'unpinned'}: {s.name}")
+                nav.dirty = True
+            return
         if s and s.cwd:
             launch("code " + shlex.quote(s.cwd))
 
     def hold(self):
         s = self.session
-        self.dismissed_ok = self.board.view.dismiss(s)
+        v = self.board.view
+        self.unpinned = False
+        if v.is_pinned(s):                        # a pinned session is never hidden: the hold unpins it
+            v.toggle_pin(s)
+            self.unpinned = True
+            log.info(f"unpinned: {s.name}")
+            nav.dirty = True
+            return
+        self.dismissed_ok = v.dismiss(s)
         if self.dismissed_ok:
             log.info(f"hidden: {s.name} ({s.state})")
             nav.dirty = True
 
     def render_held(self):
         s = self.session
+        if self.unpinned:
+            img, d, fg = tile((40, 40, 50), False)
+            draw_centered_lines(d, ["unpinned"], fg, size=14, top=27)
+            return img
         if s is not None and s.state == "running":
             img, d, fg = tile((60, 60, 70), False)
             draw_centered_lines(d, ["running,", "not", "hidden"], fg, size=12, top=14)
@@ -265,13 +299,15 @@ class CounterKey(Key):
 
 
 class PagerKey(Key):
-    """prev: previous session page; hold shows the dismissed sessions. next: next page."""
+    """prev: previous session page; hold shows the dismissed sessions. next: next
+    page; hold starts pin mode, five seconds in which a press on a session key
+    pins or unpins it."""
     dynamic = True
+    holdable = True
 
     def __init__(self, board, direction):
         super().__init__({})
         self.board, self.direction = board, direction
-        self.holdable = direction == "prev"
 
     def render(self, pressed):
         v = self.board.view
@@ -293,9 +329,18 @@ class PagerKey(Key):
         nav.dirty = True
 
     def hold(self):
-        nav.push(DismissedPage(self.board))
+        if self.direction == "prev":
+            nav.push(DismissedPage(self.board))
+        else:
+            self.board.view.start_pin_mode(time.monotonic())
+            nav.dirty = True
 
     def render_held(self):
+        if self.direction == "next":
+            img, d, fg = tile((36, 36, 44), False)
+            draw_centered_lines(d, [PIN], (255, 215, 90), size=22, top=8)
+            draw_centered_lines(d, ["press a", "session"], fg, size=11, top=38, bold=False)
+            return img
         return self.render(True)
 
 

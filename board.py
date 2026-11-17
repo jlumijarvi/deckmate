@@ -4,8 +4,9 @@ small state file that remembers dismissals.
 """
 import json
 import os
+import time
 
-from sessions import STATE_ORDER
+from sessions import STATE_ORDER, Session
 
 
 class PressTracker:
@@ -55,11 +56,12 @@ class PressTracker:
 
 
 class StateStore:
-    """state.json: {"dismissed": {session_id: state}}. Atomic writes."""
+    """state.json: {"dismissed": {session_id: state}, "pinned": {session_id: {name, cwd, gone_at?}}}.
+    Atomic writes."""
 
     def __init__(self, path):
         self.path = path
-        self.data = {"dismissed": {}}
+        self.data = {"dismissed": {}, "pinned": {}}
         self.load()
 
     def load(self):
@@ -67,7 +69,7 @@ class StateStore:
             with open(self.path) as f:
                 data = json.load(f)
             if isinstance(data, dict):
-                self.data = {"dismissed": {}, **data}
+                self.data = {"dismissed": {}, "pinned": {}, **data}
         except (OSError, ValueError):
             pass
 
@@ -84,23 +86,45 @@ class StateStore:
 
 class SessionView:
     """What the session slots show: sessions minus dismissed ones, optionally
-    filtered to one state, split into pages of `slots` keys."""
+    filtered to one state, split into pages of `slots` keys. Pinned sessions
+    sort first, cannot be hidden, and stay on the board as "gone" after their
+    process has ended, so the folder is one press away."""
+    PIN_MODE_S = 5.0
 
     def __init__(self, slots, store=None):
         self.slots = max(1, slots)
         self.store = store
         self.dismissed = dict(store.data.get("dismissed", {})) if store else {}
+        self.pinned = {sid: dict(rec) for sid, rec in (store.data.get("pinned", {}) if store else {}).items()}
         self.sessions = []
         self.filter = None
         self.page = 0
+        self.pin_mode_until = 0.0
 
     # -- input --
     def update(self, sessions):
         """New scan result. Clears a dismissal when the session is in a different
         state than it was dismissed in, and drops dismissals of vanished sessions."""
-        self.sessions = sorted(sessions, key=lambda s: (STATE_ORDER.get(s.state, 9), s.name.lower()))
-        present = {s.session_id: s for s in self.sessions}
+        sessions = list(sessions)
+        live = {s.session_id: s for s in sessions}
         changed = False
+        for sid, rec in self.pinned.items():
+            s = live.get(sid)
+            if s is not None:                     # keep the record current: the title can change
+                cwd = getattr(s, "cwd", "")
+                if rec.get("name") != s.name or rec.get("cwd") != cwd or "gone_at" in rec:
+                    rec.update(name=s.name, cwd=cwd)
+                    rec.pop("gone_at", None)
+                    changed = True
+            else:
+                if "gone_at" not in rec:
+                    rec["gone_at"] = time.time()
+                    changed = True
+                sessions.append(Session(pid=0, session_id=sid, name=rec.get("name", ""), cwd=rec.get("cwd", ""),
+                                        state="gone", waiting_kind="", since=rec["gone_at"], ctx_used=0,
+                                        ctx_window=0, transcript=""))
+        self.sessions = sorted(sessions, key=self.sort_key)
+        present = {s.session_id: s for s in self.sessions}
         for sid, state in list(self.dismissed.items()):
             s = present.get(sid)
             if s is None or s.state != state:
@@ -112,9 +136,19 @@ class SessionView:
             self.filter = None    # nothing left to show: an all-empty board would look broken
         self.page = min(self.page, max(0, self.page_count() - 1))
 
+    def sort_key(self, s):
+        return (s.session_id not in self.pinned, STATE_ORDER.get(s.state, 9), s.name.lower())
+
     # -- queries --
     def hidden(self, s):
-        return self.dismissed.get(s.session_id) == s.state
+        return s.session_id not in self.pinned and self.dismissed.get(s.session_id) == s.state
+
+    def is_pinned(self, s):
+        return s is not None and s.session_id in self.pinned
+
+    def pin_mode(self, now):
+        """True while the next-pager hold has the slots toggling pins instead of opening folders."""
+        return now < self.pin_mode_until
 
     def shown(self):
         out = [s for s in self.sessions if not self.hidden(s)]
@@ -140,7 +174,7 @@ class SessionView:
 
     # -- actions --
     def dismiss(self, s):
-        if s is None or s.state == "running":
+        if s is None or s.state == "running" or self.is_pinned(s):
             return False
         self.dismissed[s.session_id] = s.state
         self._persist()
@@ -149,7 +183,7 @@ class SessionView:
     def dismiss_all_done(self):
         n = 0
         for s in self.sessions:
-            if s.state == "done" and not self.hidden(s):
+            if s.state == "done" and not self.hidden(s) and not self.is_pinned(s):
                 self.dismissed[s.session_id] = s.state
                 n += 1
         if n:
@@ -162,6 +196,28 @@ class SessionView:
             self._persist()
             return True
         return False
+
+    def start_pin_mode(self, now):
+        self.pin_mode_until = now + self.PIN_MODE_S
+
+    def toggle_pin(self, s):
+        """Pin a session, or unpin it. Returns True when it is pinned afterwards."""
+        if s is None:
+            return False
+        if s.session_id in self.pinned:
+            del self.pinned[s.session_id]
+            if s.state == "gone":                 # nothing keeps it on the board now
+                self.sessions = [x for x in self.sessions if x.session_id != s.session_id]
+            pinned = False
+        else:
+            if s.state == "gone":
+                return False
+            self.pinned[s.session_id] = {"name": s.name, "cwd": getattr(s, "cwd", "")}
+            pinned = True
+        self.sessions = sorted(self.sessions, key=self.sort_key)
+        self.page = min(self.page, max(0, self.page_count() - 1))
+        self._persist()
+        return pinned
 
     def toggle_filter(self, state):
         """Press on a counter: show only that state, or show everything again. A
@@ -177,6 +233,7 @@ class SessionView:
     def _persist(self):
         if self.store is not None:
             self.store.data["dismissed"] = dict(self.dismissed)
+            self.store.data["pinned"] = {sid: dict(rec) for sid, rec in self.pinned.items()}
             self.store.save()
 
 
@@ -185,13 +242,13 @@ class SessionView:
 def detect_pulses(previous, sessions):
     """Compare the last known state per session with the new scan. Returns
     ([(session, new_state)], new_states_dict). A pulse is due when a known session
-    becomes done, waiting, failed or stopped; starting to run and first sightings
-    are silent."""
+    becomes done, waiting, failed, stopped or gone; starting to run and first
+    sightings are silent."""
     pulses = []
     current = {s.session_id: s.state for s in sessions}
     for s in sessions:
         before = previous.get(s.session_id)
-        if before is not None and before != s.state and s.state in ("done", "waiting", "failed", "stopped"):
+        if before is not None and before != s.state and s.state in ("done", "waiting", "failed", "stopped", "gone"):
             pulses.append((s, s.state))
     return pulses, current
 

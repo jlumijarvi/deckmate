@@ -26,7 +26,7 @@ SESSIONS_DIR = os.path.expanduser("~/.claude/sessions")
 PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
 TAIL_BYTES = 256 * 1024
 
-STATE_ORDER = {"waiting": 0, "running": 1, "done": 2, "stopped": 3, "failed": 4}
+STATE_ORDER = {"waiting": 0, "running": 1, "done": 2, "stopped": 3, "failed": 4, "gone": 5}
 QUESTION_TOOLS = {"AskUserQuestion", "ExitPlanMode"}
 
 
@@ -36,7 +36,7 @@ class Session:
     session_id: str
     name: str
     cwd: str
-    state: str            # waiting | running | done | stopped | failed
+    state: str            # waiting | running | done | stopped | failed | gone (a pinned session whose process ended)
     waiting_kind: str     # '?' or '!' while waiting, else ''
     since: float          # epoch seconds the state began
     ctx_used: int

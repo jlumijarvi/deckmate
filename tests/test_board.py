@@ -172,5 +172,53 @@ class SessionViewTest(unittest.TestCase):
         self.assertEqual(again.shown(), [])
 
 
+class PinTest(unittest.TestCase):
+    def view(self):
+        v = SessionView(5)
+        v.update(sessions(("b", "done"), ("a", "running"), ("c", "waiting")))
+        return v
+
+    def test_pinned_sorts_first_and_cannot_be_hidden(self):
+        v = self.view()
+        b = next(s for s in v.sessions if s.name == "b")
+        self.assertTrue(v.toggle_pin(b))
+        self.assertEqual([s.name for s in v.shown()], ["b", "c", "a"])
+        self.assertFalse(v.dismiss(b))
+        self.assertEqual(v.dismiss_all_done(), 0)
+        self.assertTrue(v.is_pinned(b))
+        self.assertFalse(v.toggle_pin(b))
+        self.assertEqual([s.name for s in v.shown()], ["c", "a", "b"])
+
+    def test_pinned_session_stays_as_gone_until_unpinned(self):
+        a, b = S("ida", "a", "running"), S("idb", "b", "done")
+        v = SessionView(5)
+        v.update([a, b])
+        v.toggle_pin(b)
+        v.update([a])
+        gone = v.shown()[0]
+        self.assertEqual((gone.name, gone.state, gone.session_id), ("b", "gone", "idb"))
+        self.assertEqual(v.count("done"), 0)                  # counters only count live sessions
+        self.assertFalse(v.dismiss(gone))
+        v.update([a, b])                                      # back alive: a live session again
+        self.assertEqual([s.state for s in v.shown()], ["done", "running"])
+        v.update([a])
+        v.toggle_pin(v.shown()[0])                            # unpin the gone one: it leaves at once
+        self.assertEqual([s.name for s in v.shown()], ["a"])
+
+    def test_pin_mode_times_out_and_pins_persist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = StateStore(os.path.join(tmp, "state.json"))
+            v = SessionView(5, store)
+            v.update(sessions(("b", "done")))
+            v.start_pin_mode(100.0)
+            self.assertTrue(v.pin_mode(104.9))
+            self.assertFalse(v.pin_mode(105.0))
+            v.toggle_pin(v.shown()[0])
+            again = SessionView(5, StateStore(os.path.join(tmp, "state.json")))
+            again.update([])
+            self.assertEqual([(s.name, s.state) for s in again.shown()], [("b", "gone")])
+            self.assertEqual(again.pinned["id0"]["name"], "b")
+
+
 if __name__ == "__main__":
     unittest.main()
