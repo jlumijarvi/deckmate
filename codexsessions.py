@@ -1,12 +1,13 @@
 """OpenAI Codex sessions, read the same way as Claude Code's: from files only.
 
-Codex (the CLI, 0.169 and later) runs an app-server daemon that owns every
-open thread and appends its transcript, the "rollout", under
-~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<thread id>.jsonl. The daemon
-keeps a live thread's rollout open, so the rollouts among its open files are
-the live sessions; its pid is in ~/.codex/app-server-daemon/daemon.pid.
-The thread's name is in ~/.codex/session_index.jsonl, its folder in the
-rollout's first line (session_meta). States come from the rollout's tail:
+The Codex CLI appends each thread's transcript, the "rollout", under
+~/.codex/sessions/YYYY/MM/DD/rollout-<start time>-<thread id>.jsonl, named
+with the moment the client started and carrying the working folder in its
+first line (session_meta). A live thread is matched to a running codex
+client process through those two: the process's start time (/proc) and
+folder, against the rollout's name and folder, the rollout being written
+since the process started. The thread's name is in
+~/.codex/session_index.jsonl. States come from the rollout's tail:
 task_started opens a turn (running), task_complete or turn_aborted ends it
 (done), an error event fails it, and a tool call that asked for escalated
 permissions and has no output yet is the approval prompt (waiting, with the
@@ -36,30 +37,69 @@ _JUSTIFICATION = re.compile(r'justification\s*:\s*"((?:[^"\\]|\\.)*)"')
 _CMD = re.compile(r'\bcmd\s*:\s*"((?:[^"\\]|\\.)*)"')
 
 
-def daemon_pid(path=DAEMON_PID_FILE):
-    try:
-        with open(path) as f:
-            pid = int((json.load(f) or {}).get("pid", 0))
-    except (OSError, ValueError, AttributeError):
-        return None
-    return pid if pid > 0 and os.path.exists(f"/proc/{pid}") else None
+_ROLLOUT_NAME = re.compile(r"^rollout-(\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d)-(.+)\.jsonl$")
 
 
-def open_rollouts(pid, fd_dir=None):
-    """Rollout files the daemon holds open: the live threads."""
-    fd_dir = fd_dir or f"/proc/{pid}/fd"
+def client_processes(proc="/proc"):
+    """[(start epoch seconds, working folder)] of running codex client processes:
+    the binary named codex that is not the app server."""
     out = []
-    try:
-        for fd in os.listdir(fd_dir):
-            try:
-                target = os.readlink(os.path.join(fd_dir, fd))
-            except OSError:
+    for pid in os.listdir(proc):
+        if not pid.isdigit():
+            continue
+        try:
+            with open(f"{proc}/{pid}/cmdline", "rb") as f:
+                argv = f.read().split(b"\0")
+            if not argv or os.path.basename(argv[0]) != b"codex" or argv[1:2] == [b"app-server"]:
                 continue
-            if target.endswith(".jsonl") and "/sessions/" in target and os.path.basename(target).startswith("rollout-"):
-                out.append(target)
-    except OSError:
-        pass
-    return sorted(set(out))
+            out.append((os.stat(f"{proc}/{pid}").st_ctime, os.readlink(f"{proc}/{pid}/cwd")))
+        except OSError:
+            continue
+    return out
+
+
+def name_time(path):
+    """The client start time a rollout is named with, as epoch seconds (local time), or None."""
+    m = _ROLLOUT_NAME.match(os.path.basename(path))
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), "%Y-%m-%dT%H-%M-%S").timestamp()
+    except ValueError:
+        return None
+
+
+def recent_rollouts(since, root=SESSIONS_DIR):
+    """Rollouts modified since `since`: [(path, mtime)]."""
+    out = []
+    for path in glob.glob(os.path.join(root, "*", "*", "*", "rollout-*.jsonl")):
+        try:
+            m = os.path.getmtime(path)
+        except OSError:
+            continue
+        if m >= since:
+            out.append((path, m))
+    return out
+
+
+def match(processes, rollouts, slack=5.0):
+    """Pair client processes with rollouts: [(path, process start)]. A process
+    takes the rollout in its folder written since it started whose name is
+    closest to its start time; each rollout goes to one process."""
+    taken = set()
+    out = []
+    for start, cwd in sorted(processes):
+        best = None
+        for path, mtime, folder, named in rollouts:
+            if path in taken or folder != cwd or mtime < start - slack:
+                continue
+            distance = abs((named or mtime) - start)
+            if best is None or distance < best[0]:
+                best = (distance, path)
+        if best is not None:
+            taken.add(best[1])
+            out.append((best[1], start))
+    return out
 
 
 def thread_names(path=SESSION_INDEX):
@@ -179,13 +219,10 @@ def read_tail(path):
         return []
 
 
-_ROLLOUT_NAME = re.compile(r"^rollout-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-(.+)\.jsonl$")
-
-
 def thread_id_from_name(path):
     """rollout-2026-11-17T20-49-23-<id>.jsonl, or <parent id>_<id> for a fork."""
     m = _ROLLOUT_NAME.match(os.path.basename(path))
-    stem = m.group(1) if m else os.path.basename(path)
+    stem = m.group(2) if m else os.path.basename(path)
     return stem.split("_")[-1]
 
 
@@ -204,33 +241,31 @@ class CodexScanner:
         return self._names
 
     def scan(self):
-        pid = daemon_pid()
-        if pid is None:
+        processes = client_processes()
+        if not processes:
             return []
-        sessions = []
-        names = None
-        for path in open_rollouts(pid):
+        earliest = min(start for start, _ in processes) - 5
+        rollouts = []
+        for path, mtime in recent_rollouts(earliest):
             tid, cwd = read_meta(path)
-            if not tid:
-                tid = thread_id_from_name(path)
-            if names is None:
-                names = self.names()
+            rollouts.append((path, mtime, cwd, name_time(path)))
+        sessions = []
+        names = self.names()
+        for path, start in match(processes, rollouts):
+            tid, cwd = read_meta(path)
+            tid = tid or thread_id_from_name(path)
             info = analyze_tail(read_tail(path))
             name = names.get(tid) or os.path.basename(cwd) or tid[:8]
             sessions.append(Session(
-                pid=pid, session_id=tid, name=name, cwd=cwd, state=info["state"],
+                pid=0, session_id=tid, name=name, cwd=cwd, state=info["state"],
                 waiting_kind=info["waiting_kind"], since=info["since"] or os.path.getmtime(path),
                 ctx_used=info["ctx_used"], ctx_window=info["ctx_window"], transcript=path,
                 activity=info["activity"], client="codex"))
         return sessions
 
 
-def rollouts_on_disk():
-    return sorted(glob.glob(os.path.join(SESSIONS_DIR, "*", "*", "*", "rollout-*.jsonl")))
-
-
 if __name__ == "__main__":
-    pid = daemon_pid()
-    print("daemon:", pid or "not running")
+    procs = client_processes()
+    print("codex clients:", len(procs))
     for s in CodexScanner().scan():
         print(f"{s.state:8} {s.waiting_kind:1} {s.name} ({s.cwd}) {s.activity!r} ctx {s.ctx_used}/{s.ctx_window}")

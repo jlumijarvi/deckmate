@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import codexsessions  # noqa: E402
-from codexsessions import analyze_tail, call_activity, open_rollouts, thread_id_from_name, thread_names  # noqa: E402
+from codexsessions import analyze_tail, call_activity, match, name_time, thread_id_from_name, thread_names  # noqa: E402
 
 
 def ev(t, pt=None, ts="2026-11-17T18:50:19.000Z", **payload):
@@ -76,7 +76,7 @@ class FilesTest(unittest.TestCase):
                   "_01a1ead4-5a7d-7d62-9179-050beea98da7.jsonl")
         self.assertEqual(thread_id_from_name(forked), "01a1ead4-5a7d-7d62-9179-050beea98da7")
 
-    def test_names_and_open_rollouts(self):
+    def test_names(self):
         with tempfile.TemporaryDirectory() as tmp:
             index = os.path.join(tmp, "session_index.jsonl")
             with open(index, "w") as f:
@@ -84,20 +84,23 @@ class FilesTest(unittest.TestCase):
                         + json.dumps({"id": "a", "thread_name": "New"}) + "\n")
             self.assertEqual(thread_names(index), {"a": "New"})
             self.assertEqual(thread_names(os.path.join(tmp, "missing")), {})
-            # a fake /proc/<pid>/fd: links to a rollout, a database and a socket
-            fd = os.path.join(tmp, "fd")
-            os.makedirs(fd)
-            rollout = os.path.join(tmp, "sessions", "2026", "11", "17", "rollout-2026-11-17T20-49-23-abc.jsonl")
-            os.makedirs(os.path.dirname(rollout))
-            open(rollout, "w").close()
-            os.symlink(rollout, os.path.join(fd, "3"))
-            os.symlink(os.path.join(tmp, "history.sqlite"), os.path.join(fd, "4"))
-            os.symlink("socket:[123]", os.path.join(fd, "5"))
-            self.assertEqual(open_rollouts(0, fd), [rollout])
-            self.assertEqual(open_rollouts(0, os.path.join(tmp, "no-such-process")), [])
 
-    def test_daemon_pid_missing(self):
-        self.assertIsNone(codexsessions.daemon_pid("/nonexistent/daemon.pid"))
+    def test_name_time(self):
+        import time
+        t = name_time("/x/rollout-2026-11-17T20-49-23-abc.jsonl")
+        self.assertEqual(time.localtime(t)[:6], (2026, 11, 17, 20, 49, 23))
+        self.assertIsNone(name_time("/x/other.jsonl"))
+
+    def test_match_processes_to_rollouts(self):
+        # (path, mtime, folder, named start)
+        rollouts = [("old", 1000.0, "/p", 900.0), ("mine", 2000.0, "/p", 1500.0), ("other", 2100.0, "/q", 1600.0)]
+        self.assertEqual(match([(1500.0, "/p")], rollouts), [("mine", 1500.0)])      # not "old": written before start
+        self.assertEqual(match([(1600.0, "/q")], rollouts), [("other", 1600.0)])
+        self.assertEqual(match([(3000.0, "/p")], rollouts), [])                       # no rollout yet: no prompt made
+        self.assertEqual(match([], rollouts), [])
+        # two clients in one folder: each gets its own rollout, the closest by start time
+        two = rollouts + [("second", 2500.0, "/p", 2400.0)]
+        self.assertEqual(match([(2400.0, "/p"), (1500.0, "/p")], two), [("mine", 1500.0), ("second", 2400.0)])
 
 
 if __name__ == "__main__":
