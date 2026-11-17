@@ -176,6 +176,16 @@ Every key that is about Claude Code (session slots, the counters, the pagers,
 the stats key and the stats tiles) wears a small orange `>_` in its
 bottom-left corner, so they stand out from ordinary buttons.
 
+### Codex sessions
+
+OpenAI Codex sessions (the `codex` CLI, in a terminal or VS Code) appear in
+the same slots with the same states and counters, and wear the `>_` in white
+instead of orange. Nothing needs to be set up: when Codex's app-server
+daemon runs, its open threads are on the board. Waiting means Codex is
+asking you to approve a command, and the second line is its own reason for
+asking ("May I create codex-test.txt in your home directory?"). Press opens
+the folder in VS Code, like a Claude session.
+
 ### Stats page
 
 Opened by a `stats` key. The key itself shows how much of the three plan
@@ -311,6 +321,7 @@ is updated. Everything is read-only; nothing is sent anywhere.
 | Key | Source | When it breaks |
 | --- | --- | --- |
 | sessions, counters, pagers | `~/.claude/sessions/<pid>.json` (one per running Claude Code process: title, folder, busy or idle) and the transcript `~/.claude/projects/<folder>/<session>.jsonl`, whose last entries decide waiting / done / failed | a Claude Code update that changes either file's layout; sessions then show as done or vanish |
+| codex sessions | the rollout files Codex's app-server daemon holds open (`/proc/<pid>/fd`, pid from `~/.codex/app-server-daemon/daemon.pid`), their tail (`task_started`, `task_complete`, a tool call with `require_escalated` and no output = approval prompt, `token_count` for the context bar) and `~/.codex/session_index.jsonl` for the thread name | a Codex release that changes the rollout events or stops keeping the file open; sessions then show as done or vanish |
 | stats page, stats key | Anthropic's usage API (`/api/oauth/usage`, the call Claude Code's panel makes) with the login token from `~/.claude/.credentials.json`; fallbacks: `cachedUsageUtilization` in `~/.claude.json` and `~/.config/Claude/plan-usage-history.json` from the desktop app, newest wins; tokens are summed from the transcripts above since local midnight | no login or the call fails (the fallbacks lag and grey out with their age), or the token file or API reply changes shape |
 | calendar | the `.ics` feed at the key's `url`, fetched every five minutes and cached in `~/.cache/deckmate/`; repeating events are expanded by Deckmate itself | the address stops working (Google lets you reset it); the key says "offline" until the next successful fetch, and a rule part Deckmate does not know (BYSETPOS, BYHOUR) makes that event's instances land on the wrong days |
 | slack | `root-state.json` under `~/snap/slack/`, `~/.config/Slack/` or the flatpak folder, which holds per-workspace unread totals (so a per-channel badge is not possible) | a Slack update that moves or restructures the file; the key shows "no data" |

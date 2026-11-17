@@ -15,7 +15,8 @@ from gitinfo import GitWatcher, dot_kind
 from keys import REFRESH_S, SCROLL_PX_S, Blank, Key
 from pages import NavKey, back_key, nav
 from paths import STATE_FILE
-from render import MARK_W, STATE_COLORS, code_mark, dim, draw_centered_lines, fit_lines, font, tile
+from render import MARK, MARK_CODEX, MARK_W, STATE_COLORS, code_mark, dim, draw_centered_lines, fit_lines, font, tile
+from codexsessions import CodexScanner
 from sessions import Session, SessionScanner, elapsed_text
 from system import launch
 
@@ -28,9 +29,10 @@ DEMO = False
 def demo_sessions():
     now = time.time()
     phase = int(time.monotonic() // 10) % 3   # the first session cycles running -> done -> waiting
-    mk = lambda name, state, kind, ago, ctx, activity="", agents=0: Session(
+    mk = lambda name, state, kind, ago, ctx, activity="", agents=0, client="claude": Session(
         pid=0, session_id="demo-" + name, name=name, cwd="", state=state, waiting_kind=kind,
-        since=now - ago, ctx_used=ctx, ctx_window=1_000_000, transcript="", activity=activity, agents=agents)
+        since=now - ago, ctx_used=ctx, ctx_window=1_000_000, transcript="", activity=activity, agents=agents,
+        client=client)
     return sorted([
         mk("Web MIDI synth editor", ("running", "done", "waiting")[phase], ("", "", "!")[phase], 95, 240_000,
            ("Run the unit tests", "", "Run the unit tests")[phase]),
@@ -39,6 +41,8 @@ def demo_sessions():
         mk("Laptop migration to Ubuntu", "done", "", 4000, 900_000),
         mk("blog", "stopped", "", 90000, 50_000),
         mk("garage-sale", "failed", "", 700, 300_000),
+        mk("Clarify help request", "waiting", "!", 30, 60_000, "May I create codex-test.txt in your home directory?",
+           client="codex"),
     ], key=lambda s: s.sort_key)
 
 
@@ -47,7 +51,7 @@ class SessionBoard:
     once per tick, read by every SessionSlot, CounterKey and PagerKey."""
 
     def __init__(self, slots):
-        self.scanner = SessionScanner()
+        self.scanners = [SessionScanner(), CodexScanner()]
         self.store = StateStore(STATE_FILE)
         self.view = SessionView(slots, self.store)
         self.git = GitWatcher()
@@ -65,10 +69,13 @@ class SessionBoard:
         if DEMO:
             self.sessions = demo_sessions()
         else:
-            try:
-                self.sessions = self.scanner.scan()
-            except Exception as e:  # a half-written file must not kill the board
-                log.info(f"session scan failed: {e}")
+            found = []
+            for scanner in self.scanners:
+                try:
+                    found.extend(scanner.scan())
+                except Exception as e:  # a half-written file must not kill the board
+                    log.info(f"session scan failed ({type(scanner).__name__}): {e}")
+            self.sessions = found
         pulses, self.known_states = detect_pulses(self.known_states, self.sessions)
         self.pending_pulses.extend(pulses)
         for sess in self.sessions:
@@ -189,7 +196,7 @@ def render_session(s, pressed, hidden=False, scroll_t=0.0, now=None, git=None, f
         cx, cy = KEY_PX - 8, KEY_PX - 11
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(200, 200, 210) if kind == "filled" else None,
                   outline=(200, 200, 210), width=1)
-    code_mark(d, pressed)
+    code_mark(d, pressed, color=MARK_CODEX if s.client == "codex" else MARK)
     if pin_mode and not pressed:
         d.rectangle([0, 0, KEY_PX - 1, KEY_PX - 1], outline=(255, 255, 255), width=2)
     return img

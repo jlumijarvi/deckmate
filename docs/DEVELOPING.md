@@ -40,6 +40,7 @@ logs to stdout and to `~/.local/state/deckmate/deck.log`.
 | `saver.py` | the screen saver: picture or big clock |
 | `board.py` | pure logic with no drawing: press and hold detection, dismissals, filter, paging, pulses, scrolling, breathing |
 | `sessions.py` | finds live Claude Code sessions and classifies their state from the transcript |
+| `codexsessions.py` | the same for OpenAI Codex: live threads from the daemon's open rollouts, states from the rollout tail |
 | `stats.py`, `claudeusage.py` | the plan limits (live API, Claude Code's cache, desktop app, newest wins) and the token tally for the stats page |
 | `gitinfo.py` | git state of session folders, in a background thread |
 | `slackstate.py` | reads Slack's local state file for the unread badge |

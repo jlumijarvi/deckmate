@@ -5,6 +5,10 @@ release notes on GitHub. Dates are the release dates.
 
 ## Unreleased
 
+- Codex sessions (#6): threads of the OpenAI Codex CLI appear next to Claude
+  Code sessions, with the same states, counters and gestures and a white
+  `>_` mark. An approval prompt shows as waiting with Codex's own reason for
+  asking. Read from Codex's rollout files; nothing to set up.
 - Pinned sessions (#5): hold the next-page key for pin mode, then press a
   session key to pin or unpin it. A pinned session wears a star, sorts first,
   cannot be hidden (its hold unpins instead) and stays on the board as "gone"

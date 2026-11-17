@@ -100,13 +100,15 @@ def dim(color, f=0.22):
 
 
 MARK = (217, 119, 87)     # warm orange, the colour of the corner mark
+MARK_CODEX = (230, 230, 235)   # the same mark in white on a Codex session
 MARK_W = 17               # width the corner mark takes from the left edge
 
 
-def code_mark(d, pressed, x=4, cy=KEY_PX - 10):
+def code_mark(d, pressed, x=4, cy=KEY_PX - 10, color=MARK):
     """A small terminal prompt (>_) in the bottom-left corner: this key is about
-    Claude Code sessions, not an ordinary button."""
-    color = (0, 0, 0) if pressed else MARK
+    coding-agent sessions, not an ordinary button. Orange for Claude Code, white
+    for Codex."""
+    color = (0, 0, 0) if pressed else color
     d.line([(x, cy - 5), (x + 4, cy), (x, cy + 5)], fill=color, width=2, joint="curve")
     d.line([(x + 7, cy + 5), (x + 12, cy + 5)], fill=color, width=2)
 

@@ -44,6 +44,7 @@ class Session:
     transcript: str
     activity: str = ""    # what it is doing or asking: "Bash: run tests", "? Approve plan"
     agents: int = 0       # subagents writing transcripts right now
+    client: str = "claude"   # claude | codex
 
     @property
     def sort_key(self):
