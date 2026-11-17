@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.10.0 (2026-11-17)
 
 - New `calendar` key: clock and date with the next meeting from an iCalendar
   feed (Google Calendar's secret iCal address, or any .ics URL). Red when a
