@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.10.2 (2026-11-17)
 
 - Calendar key: smaller clock, larger meeting title.
 
