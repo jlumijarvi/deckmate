@@ -3,6 +3,14 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Tray icon: when Deckmate is updated by other means than the tray itself
+  (by hand, or apt), the tray notices within seconds, restarts the board and
+  itself, so the version it shows and the code it runs are the installed
+  ones; "Check for updates" no longer says up to date next to an old version
+  row.
+
 ## 0.10.2 (2026-11-17)
 
 - Calendar key: smaller clock, larger meeting title.

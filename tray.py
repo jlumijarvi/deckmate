@@ -106,7 +106,8 @@ class Tray:
         self.update_item.connect("activate", lambda *_: self.on_update_item())
         self.menu.append(self.update_item)
         self.menu.append(Gtk.SeparatorMenuItem())
-        self.version_item = Gtk.MenuItem(label=f"Version {version()}")
+        self.started_version = version()
+        self.version_item = Gtk.MenuItem(label=f"Version {self.started_version}")
         self.version_item.set_sensitive(False)
         self.menu.append(self.version_item)
         item = Gtk.MenuItem(label="Quit tray icon")
@@ -121,6 +122,10 @@ class Tray:
 
     # -- status --
     def refresh(self):
+        installed = version()
+        if installed != self.started_version:    # updated behind our back (by hand, or apt): run the new code
+            self.after_update(f"v{installed}")
+            return False
         pid = board_pid()
         status = read_status() if pid else None
         if pid is None:
