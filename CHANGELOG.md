@@ -3,6 +3,15 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Tray icon: 0.9.5 crashed at login (a method lost its name in a rename);
+  it starts again. A new test checks that every attribute a class reads
+  exists, so a reference left behind by a rename fails the build.
+- The login screen no longer starts a board of its own: with nobody logged in
+  the deck keeps the screen saver the last board left on it instead of the
+  example keys.
+
 ## 0.9.5 (2026-11-16)
 
 - Update helper: takes a release tag, fetches the release from GitHub itself

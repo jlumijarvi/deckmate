@@ -2,6 +2,9 @@
 Description=Deckmate board for the Elgato Stream Deck
 PartOf=graphical-session.target
 After=graphical-session.target
+# the login screen's own account reaches graphical-session.target too; it has no
+# layout, so it would show the example keys while nobody is logged in
+ConditionGroup=!gdm
 
 [Service]
 Type=simple

@@ -114,12 +114,12 @@ class Tray:
         self.menu.show_all()
         self.ind.set_menu(self.menu)
 
-        self.refrerun()
+        self.refresh()
         GLib.timeout_add(2000, self.refresh)
         GLib.timeout_add_seconds(30, self.check_updates_later)
 
     # -- status --
-    def refrerun(self):
+    def refresh(self):
         pid = board_pid()
         status = read_status() if pid else None
         if pid is None:
