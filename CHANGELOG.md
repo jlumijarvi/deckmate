@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.10.3 (2026-11-17)
 
 - Tray icon: when Deckmate is updated by other means than the tray itself
   (by hand, or apt), the tray notices within seconds, restarts the board and
