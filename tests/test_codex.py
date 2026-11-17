@@ -5,7 +5,6 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import codexsessions  # noqa: E402
 from codexsessions import analyze_tail, call_activity, match, name_time, thread_id_from_name, thread_names  # noqa: E402
 
 
