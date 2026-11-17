@@ -76,13 +76,14 @@ class SessionBoard:
                 except Exception as e:  # a half-written file must not kill the board
                     log.info(f"session scan failed ({type(scanner).__name__}): {e}")
             self.sessions = found
-        pulses, self.known_states = detect_pulses(self.known_states, self.sessions)
-        self.pending_pulses.extend(pulses)
         for sess in self.sessions:
             self.first_seen.setdefault(sess.session_id, now)
             if sess.cwd:
                 self.git.want(sess.cwd)
         self.view.update(self.sessions)
+        # the view's list includes pinned sessions that are gone, so those pulse too
+        pulses, self.known_states = detect_pulses(self.known_states, self.view.sessions)
+        self.pending_pulses.extend(pulses)
 
     def animating(self):
         """True while a visible session key needs frequent repaints."""
