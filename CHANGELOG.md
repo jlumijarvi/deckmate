@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.11.0 (2026-11-17)
 
 - Codex sessions (#6): threads of the OpenAI Codex CLI appear next to Claude
   Code sessions, with the same states, counters and gestures and a white
