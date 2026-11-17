@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.9.6 (2026-11-17)
 
 - Tray icon: 0.9.5 crashed at login (a method lost its name in a rename);
   it starts again. A new test checks that every attribute a class reads
