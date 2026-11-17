@@ -3,6 +3,13 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Tray icon: a second copy refuses to start instead of showing a second
+  icon, a stopped tray removes its pid file, and a copy that did not start
+  leaves the running one's file alone (the settings window's "Show" relied
+  on it).
+
 ## 0.10.0 (2026-11-17)
 
 - New `calendar` key: clock and date with the next meeting from an iCalendar

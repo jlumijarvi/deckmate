@@ -74,6 +74,32 @@ def pid_from(path):
     return pid if os.path.exists(f"/proc/{pid}") else None
 
 
+def claim_pid(path):
+    """Write this process's pid to the file. False when the file names a process
+    that is still alive: a second copy must not start (two tray icons)."""
+    other = pid_from(path)
+    if other is not None and other != os.getpid():
+        return False
+    with open(path, "w") as f:
+        f.write(str(os.getpid()))
+    return True
+
+
+def release_pid(path):
+    """Remove the pid file, but only when it is still ours: a copy that refused
+    to start, or a later process, must not delete the running one's file."""
+    try:
+        with open(path) as f:
+            mine = int(f.read().strip()) == os.getpid()
+    except (OSError, ValueError):
+        return
+    if mine:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 def board_pid():
     return pid_from(PID_FILE)
 
