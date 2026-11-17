@@ -71,18 +71,19 @@ class Calendar(Key):
         img, d, fg = tile(bg, pressed)
         if occ is not None and not pressed:
             d.rectangle([0, 0, KEY_PX, 3], fill=STATE_COLORS[state])
-        draw_centered_lines(d, [now.strftime("%H:%M")], fg, size=16, top=4)
+        # the clock stays small: the meeting is the point of the key
+        draw_centered_lines(d, [now.strftime("%H:%M")], fg, size=13, top=4)
         draw_centered_lines(d, [now.strftime("%a %-d.%-m.")], (190, 190, 200) if not pressed else fg,
-                            size=9, top=22, bold=False)
+                            size=9, top=19, bold=False)
         if occ is None:
-            draw_centered_lines(d, [state], (170, 170, 180) if not pressed else fg, size=10, top=44, bold=False)
+            draw_centered_lines(d, [state], (170, 170, 180) if not pressed else fg, size=10, top=42, bold=False)
             return img
         start = occ.start.astimezone(now.tzinfo)
         end = occ.end.astimezone(now.tzinfo)
         head = f"now → {end:%H:%M}" if state == "now" else f"{start:%H:%M}"
-        draw_centered_lines(d, [head], fg, size=10, top=35)
-        lines, size = fit_lines(occ.summary or "(no title)", max_lines=2, sizes=(10, 9))
-        draw_centered_lines(d, lines, fg, size=size, top=47, bold=False)
+        draw_centered_lines(d, [head], fg, size=10, top=32)
+        lines, size = fit_lines(occ.summary or "(no title)", max_lines=2, sizes=(11, 10, 9))
+        draw_centered_lines(d, lines, fg, size=size, top=44, bold=False)
         return img
 
     def press(self):

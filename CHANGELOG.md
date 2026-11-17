@@ -3,6 +3,10 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Calendar key: smaller clock, larger meeting title.
+
 ## 0.10.1 (2026-11-17)
 
 - Tray icon: a second copy refuses to start instead of showing a second
