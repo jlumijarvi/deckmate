@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.11.1 (2026-11-17)
 
 - A pinned session that goes "gone" sweeps its band across the deck like other state changes.
 
