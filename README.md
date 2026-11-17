@@ -228,8 +228,11 @@ are the items, overdue first, then by due date, then undated; with more than
 ## Calendar
 
 The `calendar` key reads an iCalendar feed. For Google Calendar: calendar
-settings, "Integrate calendar", copy the *secret address in iCal format* and
-paste it into the key's dialog. It works with any `.ics` address (Outlook's
+settings, "Integrate calendar", then the *secret address in iCal format*,
+which is shown as dots until you click the eye icon next to it; copy it and
+paste it into the key's dialog. It ends in `/private-…/basic.ics`. The two
+public addresses above it do not work unless the calendar is public (the key
+then says "offline", and the log shows 401 or 404). It works with any `.ics` address (Outlook's
 published calendar, Nextcloud, a Fastmail calendar). The address is the
 only thing sent anywhere, and only to that server; the feed is fetched every
 five minutes and kept in `~/.cache/deckmate/`, so the key works right after
