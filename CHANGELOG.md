@@ -3,6 +3,17 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- New `calendar` key: clock and date with the next meeting from an iCalendar
+  feed (Google Calendar's secret iCal address, or any .ics URL). Red when a
+  meeting is about to start, green while one is on; press joins it, hold
+  opens today's events as a folder. Repeating events, exceptions and moved
+  instances are expanded by Deckmate itself; the feed is cached so the key
+  works offline (#17).
+- Slack key: the badge follows Slack's own colours, red for mentions and DMs,
+  blue for unread channels (#18).
+
 ## 0.9.6 (2026-11-17)
 
 - Tray icon: 0.9.5 crashed at login (a method lost its name in a rename);

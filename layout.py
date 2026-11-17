@@ -3,6 +3,7 @@ data providers, brightness and the screen saver."""
 import logging
 import os
 
+from calendarkeys import Calendar
 from deckhid import KEY_COUNT
 from folderkeys import Folder
 from keys import Blank, Brightness, Clock, Command, Mute, Volume
@@ -20,7 +21,7 @@ log = logging.getLogger("deck")
 
 
 KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume, "slack": Slack, "media": Media,
-             "vpn": Vpn}
+             "vpn": Vpn, "calendar": Calendar}
 
 
 class BuildContext:

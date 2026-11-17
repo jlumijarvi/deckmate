@@ -36,6 +36,7 @@ logs to stdout and to `~/.local/state/deckmate/deck.log`.
 | `slackkey.py`, `todokeys.py` | the Slack key; the to-do key, its sub-deck and item keys |
 | `mediakeys.py`, `mpris.py` | Spotify (any MPRIS player) keys; the D-Bus side with the cover cache |
 | `vpnkey.py` | the VPN key over nmcli |
+| `calfeed.py`, `calendarkeys.py` | the iCalendar feed: fetch, cache, parse, recurrence; the calendar key and its page |
 | `saver.py` | the screen saver: picture or big clock |
 | `board.py` | pure logic with no drawing: press and hold detection, dismissals, filter, paging, pulses, scrolling, breathing |
 | `sessions.py` | finds live Claude Code sessions and classifies their state from the transcript |

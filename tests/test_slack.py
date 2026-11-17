@@ -3,6 +3,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from slackkey import BLUE, GREY, RED, badge_color  # noqa: E402
 from slackstate import SlackState  # noqa: E402
 
 
@@ -22,6 +23,12 @@ class SlackParseTest(unittest.TestCase):
         self.assertEqual(ws[0]["icon_url"], "u230")
         self.assertEqual(s.unreads("T1"), (3, 1))
         self.assertIsNone(s.unreads("T2"))
+
+    def test_badge_follows_slacks_own_colours(self):
+        self.assertEqual(badge_color(3, 1), RED)      # a mention or DM: red, like Slack's badge
+        self.assertEqual(badge_color(3, 0), BLUE)     # unread channels only: Slack's blue dot
+        self.assertEqual(badge_color(0, 0), GREY)
+        self.assertEqual(badge_color(None, None), GREY)
 
     def test_missing_data(self):
         s = SlackState()

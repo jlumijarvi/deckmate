@@ -23,6 +23,7 @@ STATUS_FILE = os.path.join(RUNTIME_DIR, "status.json")
 STATE_FILE = os.path.join(CONFIG_DIR, "state.json")
 LOG_DIR = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "deckmate")
 LOG_FILE = os.path.join(LOG_DIR, "deck.log")
+CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "deckmate")
 
 INSTALLED = HERE.startswith("/usr/")
 

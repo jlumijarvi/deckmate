@@ -42,7 +42,7 @@ class SetKeyTest(unittest.TestCase):
             for kind, _ in KEY_KINDS:
                 cfg = {"keys": {}}
                 set_key(cfg, 1, kind, label="T", color="#112233", run="true", team="T1", todo=todo,
-                        tiles=["tokens"], connection="Office")
+                        tiles=["tokens"], connection="Office", calendar={"url": "", "warn_min": 5})
                 self.assertEqual(key_kind(cfg, 1)[0], kind, kind)
                 path = os.path.join(tmp, "keys.json")
                 with open(path, "w") as f:

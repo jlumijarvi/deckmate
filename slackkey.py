@@ -8,7 +8,20 @@ from slackstate import SNAP_ICON, SlackState
 from system import launch
 
 
+RED = (225, 40, 40)        # mentions and DMs, like the red badge on Slack's own icon
+BLUE = (52, 140, 235)      # unread channels only, like Slack's blue dot
+GREY = (90, 90, 100)       # nothing unread, or no data
+
 _slack_state = None
+
+
+def badge_color(unread, mentions):
+    """Slack's own convention: red for mentions and DMs, blue for other unreads."""
+    if mentions:
+        return RED
+    if unread:
+        return BLUE
+    return GREY
 
 
 def slack_state():
@@ -20,7 +33,8 @@ def slack_state():
 
 class Slack(Key):
     """Workspace logo, name, and a badge with the number of conversations that
-    have unread messages. Mentions and DMs are shown separately when non-zero."""
+    have unread messages: red when any are mentions or DMs (shown as @n too),
+    blue otherwise, grey when nothing is unread."""
     dynamic = True
     _logo = None
 
@@ -60,7 +74,7 @@ class Slack(Key):
         unread, mentions = counts if counts else (None, None)
         # badge top-right
         text = "?" if unread is None else str(unread)
-        badge = (225, 40, 40) if unread else (90, 90, 100)
+        badge = badge_color(unread, mentions)
         f = font(16 if len(text) < 3 else 12)
         w = d.textlength(text, font=f)
         r = 13

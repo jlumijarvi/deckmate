@@ -25,6 +25,7 @@ GLib.set_prgname(APP_ID)
 from deckhid import Deck, UnsupportedDeck, find_deck, COLS, KEY_COUNT  # noqa: E402
 from slackstate import SlackState  # noqa: E402
 from system import board_pid, service_loaded, start_board, stop_board, tray_pid  # noqa: E402
+from calendarkeys import DEFAULT_WARN_MIN  # noqa: E402
 from vpnkey import vpn_connections  # noqa: E402
 
 from paths import HERE, CONFIG, EXAMPLE, config_path, read_layout, version, write_layout  # noqa: E402
@@ -35,6 +36,7 @@ KEY_KINDS = [
     ("command", "Button"),
     ("folder", "Folder"),
     ("clock", "Clock"),
+    ("calendar", "Calendar"),
     ("mute_source", "Mic mute"),
     ("mute_sink", "Speaker mute"),
     ("volume_down", "Volume down"),
@@ -63,7 +65,9 @@ KIND_HINT = {
               "Save, then open the folder to fill it",
     "mute_source": "Toggles the microphone; the key shows its state",
     "mute_sink": "Toggles the speakers; the key shows its state",
-    "slack": "Unread count and @mentions of one Slack workspace",
+    "calendar": "Clock and date with the next meeting from an iCalendar feed; red when one is about to start. "
+                "Press opens the meeting's link, hold opens today's list",
+    "slack": "Unread count of one Slack workspace: red with mentions or DMs, blue otherwise",
     "media_playpause": "The playing track with its cover; press plays or pauses, or launches Spotify",
     "media_next": "Skips to the next track",
     "media_previous": "Goes back to the previous track",
@@ -111,7 +115,7 @@ def key_kind(cfg, i):
         return ("mute_source" if k.get("target") == "source" else "mute_sink"), k
     if t == "volume":
         return ("volume_up" if int(k.get("step", 5)) > 0 else "volume_down"), k
-    if t in ("clock", "slack", "todo", "stats", "brightness", "vpn", "folder"):
+    if t in ("clock", "calendar", "slack", "todo", "stats", "brightness", "vpn", "folder"):
         return t, k
     if t == "counter":
         return "counter_" + (k.get("state") or "waiting"), k
@@ -122,7 +126,8 @@ def key_kind(cfg, i):
     return "command", k
 
 
-def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None, tiles=None, connection=None):
+def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None, tiles=None, connection=None,
+            calendar=None):
     keys = cfg.setdefault("keys", {})
     sess = [s for s in session_keys(cfg) if s != i]
     old = keys.pop(str(i), None) or {}
@@ -135,6 +140,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
         keys[str(i)] = {"type": "folder", "title": label, "color": color, "keys": inside or {}}
     elif kind == "clock":
         keys[str(i)] = {"type": "clock"}
+    elif kind == "calendar":
+        keys[str(i)] = {"type": "calendar", **(calendar or {})}
     elif kind == "slack":
         keys[str(i)] = {"type": "slack", **({"team": team} if team else {})}
     elif kind == "todo":
@@ -180,6 +187,8 @@ def key_summary(cfg, i):
         return "Claude\nsession"
     if kind == "slack":
         return "Slack\n" + (k.get("team") or "")
+    if kind == "calendar":
+        return "Calendar\n" + ("feed set" if k.get("url") else "no feed")
     if kind == "todo":
         return "To-do\n" + os.path.basename(k.get("file") or "todo.md")
     if kind.startswith("counter_"):
@@ -333,6 +342,14 @@ class KeyDialog(Adw.Dialog):
         self.team_row.set_selected(ids.index(k["team"]) if k.get("team") in ids else 0)
         group.add(self.team_row)
 
+        self.cal_url = Adw.EntryRow(title="Feed address (.ics)")
+        self.cal_url.set_text(k.get("url", ""))
+        group.add(self.cal_url)
+        self.cal_warn = Adw.SpinRow.new_with_range(0, 60, 1)
+        self.cal_warn.set_title("Minutes before a meeting when the key turns red")
+        self.cal_warn.set_value(float(k.get("warn_min", DEFAULT_WARN_MIN) or 0))
+        group.add(self.cal_warn)
+
         self.vpn_names = vpn_connections()
         self.vpn_row = Adw.ComboRow(title="Connection")
         self.vpn_row.set_model(Gtk.StringList.new(self.vpn_names or ["no VPN connections in NetworkManager"]))
@@ -400,6 +417,8 @@ class KeyDialog(Adw.Dialog):
         self.run_row.set_visible(kind == "command")
         self.team_row.set_visible(kind == "slack")
         self.vpn_row.set_visible(kind == "vpn")
+        self.cal_url.set_visible(kind == "calendar")
+        self.cal_warn.set_visible(kind == "calendar")
         for row in (self.todo_file, self.todo_open, self.todo_soon, self.todo_hold):
             row.set_visible(kind == "todo")
         for row in self.stats_tiles.values():
@@ -420,8 +439,9 @@ class KeyDialog(Adw.Dialog):
         }
         tiles = [name for name, row in self.stats_tiles.items() if row.get_active()]
         connection = self.vpn_names[self.vpn_row.get_selected()] if self.vpn_names else None
+        calendar = {"url": self.cal_url.get_text().strip(), "warn_min": int(self.cal_warn.get_value())}
         set_key(self.cfg, self.index, self.kind(), label=label, color=color, run=self.run_row.get_text(),
-                team=team, todo=todo, tiles=tiles, connection=connection)
+                team=team, todo=todo, tiles=tiles, connection=connection, calendar=calendar)
         self.window.save()
         self.window.refresh_grid()
         self.close()
