@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.12.0 (2026-11-19)
 
 - To-do key: the footer also says how long ago the list was last edited
   (#19).
