@@ -36,7 +36,7 @@ SCOPES = "channels:read, groups:read, im:read, mpim:read, users:read"
 
 @dataclass
 class Unread:
-    name: str          # "#general", "@anna", or the group's name
+    name: str          # "#general", "@demo-user", or the group's name
     count: int
     last_read: float   # the ts of the last read message: the smallest is the oldest unread
 

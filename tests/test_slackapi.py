@@ -10,9 +10,9 @@ from slackapi import Unread, caption, conversation_name, parse_conversations, un
 class ParseTest(unittest.TestCase):
     def test_names(self):
         self.assertEqual(conversation_name({"name": "general"}), "#general")
-        self.assertEqual(conversation_name({"is_im": True, "user": "U1"}, {"U1": "anna"}), "@anna")
+        self.assertEqual(conversation_name({"is_im": True, "user": "U1"}, {"U1": "demo-user"}), "@demo-user")
         self.assertEqual(conversation_name({"is_im": True, "user": "U2"}), "@U2")
-        self.assertEqual(conversation_name({"is_mpim": True, "name": "mpdm-anna--bob--carl-1"}), "anna, bob, carl")
+        self.assertEqual(conversation_name({"is_mpim": True, "name": "mpdm-pat--sam--kim-1"}), "pat, sam, kim")
 
     def test_conversations_and_unread(self):
         listing = {"ok": True, "channels": [{"id": "C1", "name": "general"},
@@ -27,14 +27,14 @@ class ParseTest(unittest.TestCase):
         self.assertAlmostEqual(u.last_read, 1700000000.0001)
         self.assertIsNone(unread_from_info({"ok": True, "channel": {"unread_count_display": 0}}, convs[0]))
         dm = unread_from_info({"ok": True, "channel": {"unread_count_display": 1, "last_read": "5"}}, convs[1],
-                              {"U1": "anna"})
-        self.assertEqual(dm.name, "@anna")
+                              {"U1": "demo-user"})
+        self.assertEqual(dm.name, "@demo-user")
 
     def test_caption(self):
         self.assertEqual(caption([]), "")
         self.assertEqual(caption([Unread("#general", 2, 10.0)]), "#general")
-        self.assertEqual(caption([Unread("#general", 2, 10.0), Unread("@anna", 1, 5.0), Unread("#dev", 1, 7.0)]),
-                         "@anna +2")
+        self.assertEqual(caption([Unread("#general", 2, 10.0), Unread("@demo-user", 1, 5.0), Unread("#dev", 1, 7.0)]),
+                         "@demo-user +2")
 
     def test_poller_without_a_thread(self):
         api = slackapi.SlackApi("xoxp-test", start=False)
@@ -51,16 +51,17 @@ class ParseTest(unittest.TestCase):
                       "D1": {"unread_count_display": 2, "last_read": "3"}}[params["channel"]]
                 return {"ok": True, "channel": ch}
             if method == "users.info":
-                return {"ok": True, "user": {"profile": {"display_name": "anna"}}}
+                return {"ok": True, "user": {"profile": {"display_name": "demo-user"}}}
             raise AssertionError(method)
+        real_call, real_gap = slackapi.call, slackapi.CALL_GAP_S
         slackapi.call, slackapi.CALL_GAP_S = fake_call, 0
         try:
             unreads = api._round()
         finally:
-            slackapi.CALL_GAP_S = 0.15
-        self.assertEqual([(u.name, u.count) for u in unreads], [("@anna", 2)])
+            slackapi.call, slackapi.CALL_GAP_S = real_call, real_gap
+        self.assertEqual([(u.name, u.count) for u in unreads], [("@demo-user", 2)])
         self.assertEqual(calls, ["users.conversations", "conversations.info", "conversations.info", "users.info"])
-        self.assertEqual(caption(unreads), "@anna")
+        self.assertEqual(caption(unreads), "@demo-user")
 
 
 if __name__ == "__main__":

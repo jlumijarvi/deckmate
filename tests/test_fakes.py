@@ -60,7 +60,7 @@ class SourcesTest(unittest.TestCase):
             unreads = api._round()
         finally:
             slackapi.CALL_GAP_S = 0.15
-        self.assertEqual(slackapi.caption(unreads), "@anna +1")
+        self.assertEqual(slackapi.caption(unreads), "@demo-user +1")
 
     def test_usage_and_calendar(self):
         usage = claudeusage.fetch_usage(path="/nonexistent/credentials.json")

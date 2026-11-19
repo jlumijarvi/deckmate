@@ -308,7 +308,7 @@ scratch in your workspace, under *OAuth & Permissions* add the **User Token
 Scopes** `channels:read`, `groups:read`, `im:read`, `mpim:read` and
 `users:read`, install the app to the workspace and copy the *User OAuth
 Token* (`xoxp-…`) into the key's dialog. The caption under the badge then
-names the unread conversation (`#general`, `@anna`), or the one with the
+names the unread conversation (`#general`, `@demo-user`), or the one with the
 oldest unread message plus how many others (`#general +2`). While the token
 is set, Deckmate asks Slack about each of your conversations once a minute
 whenever the state file says something is unread (at most 80
