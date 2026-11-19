@@ -3,6 +3,10 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Test fixtures and samples use plainly made-up names.
+
 ## 0.12.1 (2026-11-19)
 
 - For developing: `./dev.sh start` runs the checkout on the deck in place
