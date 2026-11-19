@@ -9,8 +9,9 @@ Files, all optional:
   slack-state.json   a root-state.json: workspaces and per-workspace unreads
   slack-api.json     {"users.conversations": reply, "conversations.info": {id: reply},
                       "users.info": {id: reply}}
-  usage.json         the usage API's utilization dict; a resets_at of "+90s" means
-                      90 seconds after the board started, so a window reset can be
+  usage.json         the usage API's utilization dict; a resets_at of "+3m" means
+                      three minutes after the board started (a sample within two
+                      minutes of a window's end does not count as a reset), so a window reset can be
                       watched happening
   calendar.ics       an iCalendar feed; {today} is today's date as 20261119 and
                       {now+15m} a time 15 minutes from the start as 20261119T101500,

@@ -1,7 +1,7 @@
 {
   "five_hour": {
     "utilization": 97,
-    "resets_at": "+2m"
+    "resets_at": "+3m"
   },
   "seven_day": {
     "utilization": 41,
@@ -12,7 +12,7 @@
       "kind": "session",
       "group": "session",
       "percent": 97,
-      "resets_at": "+2m",
+      "resets_at": "+3m",
       "is_active": true
     },
     {

@@ -39,7 +39,7 @@ environment and shows up in `journalctl`):
 that need a network or an account answer from files there instead:
 Slack's state file and Web API (`slack-state.json`, `slack-api.json`), the
 Claude usage API (`usage.json`, whose 5-hour window is 97% used and resets
-two minutes after the start, so the cyan sweep and the reset notification
+three minutes after the start, so the cyan sweep and the reset notification
 can be watched), and the calendar feed (`calendar.ics`, with a meeting
 running now and one starting in 14 minutes, so the key turns red a minute
 later). A Slack key then works without Slack installed, and a token of any

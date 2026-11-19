@@ -66,7 +66,7 @@ class SourcesTest(unittest.TestCase):
         usage = claudeusage.fetch_usage(path="/nonexistent/credentials.json")
         self.assertEqual(usage["five_hour"]["utilization"], 97)
         reset = datetime.strptime(usage["five_hour"]["resets_at"], "%Y-%m-%dT%H:%M:%S%z").timestamp()
-        self.assertAlmostEqual(reset, fakes._started + 120, delta=1)
+        self.assertAlmostEqual(reset, fakes._started + 180, delta=1)
         text = calfeed.fetch("https://example.invalid/never-called.ics")
         events = calfeed.parse_ics(text)
         today = calfeed.occurrences(events, datetime.now().astimezone().date())
