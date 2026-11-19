@@ -20,6 +20,34 @@ The checkout and the installed package use the same config directory,
 (`systemctl --user stop deckmate`) or the two fight over the deck. The board
 logs to stdout and to `~/.local/state/deckmate/deck.log`.
 
+### Trying a change on the deck before a release
+
+`dev.sh` swaps the checkout in for the installed package and back, each
+piece as a transient systemd user unit (so it gets the session's clean
+environment and shows up in `journalctl`):
+
+```
+./dev.sh start            # stop the installed board, run the checkout's on the deck
+./dev.sh start --fakes    # ... with made-up sessions and canned Slack, usage and calendar data
+./dev.sh settings         # the checkout's settings window
+./dev.sh tray             # the checkout's tray icon in place of the installed one
+./dev.sh log              # follow the dev board's log
+./dev.sh stop             # the installed board (and tray) again
+```
+
+`--fakes` sets `DECKMATE_FAKES` to `tests/fixtures/`; with it, the sources
+that need a network or an account answer from files there instead:
+Slack's state file and Web API (`slack-state.json`, `slack-api.json`), the
+Claude usage API (`usage.json`, whose 5-hour window is 97% used and resets
+two minutes after the start, so the cyan sweep and the reset notification
+can be watched), and the calendar feed (`calendar.ics`, with a meeting
+running now and one starting in 14 minutes, so the key turns red a minute
+later). A Slack key then works without Slack installed, and a token of any
+text (`xoxp-test`) makes it name the unread conversation. `fakes.py`
+documents the files; the same fixtures back `tests/test_fakes.py`. The
+board itself also takes `--fakes DIR`. `./dev.sh start --fakes --config tests/fixtures/keys.json`
+shows a board with every such key on it instead of your own layout.
+
 ## Files
 
 | File | What it is |
@@ -47,6 +75,8 @@ logs to stdout and to `~/.local/state/deckmate/deck.log`.
 | `slackapi.py` | optional: which conversation is unread, from Slack's Web API with a user token |
 | `todo.py` | parses and watches the Markdown to-do list |
 | `system.py` | shell helpers and which account owns the screen (logind) |
+| `fakes.py`, `tests/fixtures/` | canned Slack, usage and calendar data for trying keys without accounts (`DECKMATE_FAKES`) |
+| `dev.sh` | run the checkout on the deck in place of the installed package, and back |
 | `paths.py` | where config, state, pid and log files live; migration from the old name |
 | `settings.py` | settings window (GTK 4 + libadwaita) |
 | `tray.py` | top-bar icon (GTK 3 + AppIndicator) with status, start/stop, settings and updates |

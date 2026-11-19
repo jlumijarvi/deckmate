@@ -1,0 +1,60 @@
+{
+  "users.conversations": {
+    "ok": true,
+    "channels": [
+      {
+        "id": "C1",
+        "name": "general"
+      },
+      {
+        "id": "C2",
+        "name": "deckmate"
+      },
+      {
+        "id": "D1",
+        "is_im": true,
+        "user": "U1"
+      }
+    ]
+  },
+  "conversations.info": {
+    "C1": {
+      "ok": true,
+      "channel": {
+        "id": "C1",
+        "name": "general",
+        "unread_count_display": 2,
+        "last_read": "1700000100.0"
+      }
+    },
+    "C2": {
+      "ok": true,
+      "channel": {
+        "id": "C2",
+        "name": "deckmate",
+        "unread_count_display": 0
+      }
+    },
+    "D1": {
+      "ok": true,
+      "channel": {
+        "id": "D1",
+        "is_im": true,
+        "user": "U1",
+        "unread_count_display": 1,
+        "last_read": "1700000000.0"
+      }
+    }
+  },
+  "users.info": {
+    "U1": {
+      "ok": true,
+      "user": {
+        "id": "U1",
+        "profile": {
+          "display_name": "anna"
+        }
+      }
+    }
+  }
+}

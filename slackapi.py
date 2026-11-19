@@ -22,6 +22,8 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
+import fakes
+
 log = logging.getLogger("deck")
 
 API = "https://slack.com/api/"
@@ -41,6 +43,9 @@ class Unread:
 
 def call(token, method, timeout=15, **params):
     """One Web API call. Returns the JSON reply; raises on HTTP errors and on ok=false."""
+    canned = fakes.slack_api(method, params) if fakes.directory() else None
+    if canned is not None:
+        return canned
     url = API + method + ("?" + urllib.parse.urlencode(params) if params else "")
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", "User-Agent": "deckmate"})
     with urllib.request.urlopen(req, timeout=timeout) as r:

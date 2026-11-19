@@ -13,11 +13,15 @@ import glob
 import json
 import os
 
+import fakes
+
 SNAP_ICON = "/snap/slack/current/usr/share/pixmaps/slack.png"
 
 
 def state_path():
     """The newest root-state.json among the known install locations, or None."""
+    if fakes.directory() and fakes.path("slack-state.json"):
+        return fakes.path("slack-state.json")
     candidates = [
         os.path.expanduser("~/snap/slack/current/.config/Slack/storage/root-state.json"),
         os.path.expanduser("~/.config/Slack/storage/root-state.json"),

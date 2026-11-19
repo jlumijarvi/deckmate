@@ -14,6 +14,8 @@ import time
 import urllib.error
 import urllib.request
 
+import fakes
+
 CREDENTIALS = os.path.expanduser("~/.claude/.credentials.json")
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 POLL_S = 5 * 60
@@ -37,6 +39,10 @@ def read_token(path=CREDENTIALS):
 def fetch_usage(path=CREDENTIALS, timeout=15):
     """The utilization dict (five_hour, seven_day, limits, ...) or None without a token.
     Raises urllib.error.URLError / HTTPError on a failed call."""
+    if fakes.directory():
+        canned = fakes.load_json("usage.json")
+        if canned is not None:
+            return fakes.resolve_times(canned)
     token = read_token(path)
     if not token:
         return None

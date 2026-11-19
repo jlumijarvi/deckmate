@@ -1,0 +1,30 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Deckmate//fixtures//EN
+BEGIN:VEVENT
+UID:fake-1
+DTSTART;VALUE=DATE:{today}
+DTEND;VALUE=DATE:{today}
+SUMMARY:Office day
+END:VEVENT
+BEGIN:VEVENT
+UID:fake-2
+DTSTART:{now-20m}
+DTEND:{now+10m}
+SUMMARY:Planning with the platform team
+X-GOOGLE-CONFERENCE:https://meet.google.com/aaa-bbbb-ccc
+END:VEVENT
+BEGIN:VEVENT
+UID:fake-3
+DTSTART:{now+14m}
+DTEND:{now+44m}
+SUMMARY:Customer call
+LOCATION:https://zoom.us/j/123
+END:VEVENT
+BEGIN:VEVENT
+UID:fake-4
+DTSTART:{now+2h}
+DTEND:{now+3h}
+SUMMARY:1:1
+END:VEVENT
+END:VCALENDAR

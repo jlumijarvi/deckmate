@@ -1,0 +1,21 @@
+{
+  "workspaces": {
+    "T0FAKE": {
+      "name": "Demo Workspace",
+      "domain": "demo",
+      "order": 0,
+      "icon": {}
+    }
+  },
+  "webapp": {
+    "teams": {
+      "T0FAKE": {
+        "unreads": {
+          "unreads": 3,
+          "unreadHighlights": 1,
+          "showBullet": true
+        }
+      }
+    }
+  }
+}

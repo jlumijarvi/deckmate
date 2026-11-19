@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import fakes
 from paths import CACHE_DIR
 
 log = logging.getLogger("deck")
@@ -390,6 +391,10 @@ def next_meeting(occs, now, warn_s):
 # --- the feed ----------------------------------------------------------------
 
 def fetch(url, timeout=20):
+    if fakes.directory():
+        canned = fakes.text("calendar.ics")
+        if canned is not None:
+            return canned
     req = urllib.request.Request(url, headers={"Accept": "text/calendar, */*", "User-Agent": "deckmate"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read().decode("utf-8", "replace")

@@ -3,6 +3,14 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- For developing: `./dev.sh start` runs the checkout on the deck in place
+  of the installed package (`stop` puts it back); `--fakes` answers Slack,
+  the usage API and the calendar feed from files in `tests/fixtures/`, so
+  every key can be tried without an account or a token, including a usage
+  window reset and a meeting about to start.
+
 ## 0.12.0 (2026-11-19)
 
 - To-do key: the footer also says how long ago the list was last edited
