@@ -115,6 +115,7 @@ class UsageTest(unittest.TestCase):
         self.now = T0 + 601
         u.refresh()
         self.assertEqual(u.reset_events, ["session"])
+        self.assertEqual(u.reset_from, {"session": 10})     # how full it was, for the notification
         self.assertTrue(u.new_window["session"])
         self.assertEqual(u.used("session"), 0)
         u.refresh()

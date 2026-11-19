@@ -3,6 +3,15 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- To-do key: the footer also says how long ago the list was last edited
+  (#19).
+- A desktop notification when a 5-hour or weekly Claude window that was
+  90% used or more resets; switch in the General tab (#20).
+- The `>_` corner mark on Claude and Codex keys can be turned off from any
+  of those keys' dialogs, for a board that only ever shows Claude (#22).
+
 ## 0.11.1 (2026-11-17)
 
 - A pinned session that goes "gone" sweeps its band across the deck like other state changes.

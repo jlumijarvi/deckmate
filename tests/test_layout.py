@@ -202,5 +202,27 @@ class LayoutTest(unittest.TestCase):
         self.assertIsInstance(nav.stack[-1], StatsPage)
 
 
+class OptionsTest(unittest.TestCase):
+    def test_mark_and_notify_switches_reach_their_modules(self):
+        import render
+        import stats
+        with tempfile.TemporaryDirectory() as tmp:
+            isolate(self, tmp)
+            path = os.path.join(tmp, "keys.json")
+            with open(path, "w") as f:
+                json.dump({"keys": {}, "sessions": {"keys": [], "mark": False}, "notify": {"resets": False}}, f)
+            try:
+                load_board(path)
+                self.assertFalse(render.SHOW_MARK)
+                self.assertFalse(stats.NOTIFY_RESETS)
+                with open(path, "w") as f:
+                    json.dump({"keys": {}}, f)
+                load_board(path)
+                self.assertTrue(render.SHOW_MARK)
+                self.assertTrue(stats.NOTIFY_RESETS)
+            finally:
+                render.SHOW_MARK, stats.NOTIFY_RESETS = True, True
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -91,5 +91,19 @@ class LinkTest(unittest.TestCase):
         self.assertEqual([i.link for i in items], ["https://example.com/page", "notes/b.md"])
 
 
+class MtimeTest(unittest.TestCase):
+    def test_list_remembers_when_the_file_was_written(self):
+        import tempfile
+        from todo import TodoList
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "todo.md")
+            with open(path, "w") as f:
+                f.write("- [ ] one\n")
+            t = TodoList(path)
+            self.assertIsNone(t.mtime)
+            t.refresh()
+            self.assertAlmostEqual(t.mtime, os.path.getmtime(path))
+
+
 if __name__ == "__main__":
     unittest.main()

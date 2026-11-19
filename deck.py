@@ -52,6 +52,7 @@ import time
 from PIL import Image, ImageDraw
 
 import sessionkeys
+import stats
 from board import Effects, PressTracker
 from deckhid import COLS, KEY_COUNT, KEY_PX, Deck, UnsupportedDeck, find_deck
 from keys import FRAME_S, HOLD_S, REFRESH_S
@@ -60,7 +61,7 @@ from pages import nav
 from paths import LOG_FILE, PID_FILE, STATUS_FILE, config_path, ensure_dirs
 from render import CYAN, STATE_COLORS, board_image
 from sessionkeys import SessionSlot
-from system import seat_active_uid
+from system import notify, seat_active_uid
 
 log = logging.getLogger("deck")
 RECONNECT_S = 2.0
@@ -207,6 +208,12 @@ def main():
             if usage is not None and usage.reset_events:
                 effects.pulse(now, CYAN)
                 log.info(f"limit window reset: {', '.join(usage.reset_events)}")
+                for name in usage.reset_events:
+                    before = usage.reset_from.get(name, 0)
+                    if stats.NOTIFY_RESETS and before >= stats.NOTIFY_RESET_PCT:
+                        lim = usage.limits.get(name)
+                        notify(f"Claude: {lim.label if lim else name} limit reset",
+                               f"That window was {before}% used; it is open again.")
         if nav.dirty:
             nav.dirty = False
             sent = [None] * KEY_COUNT

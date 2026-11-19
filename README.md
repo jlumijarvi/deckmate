@@ -114,7 +114,7 @@ a plain button with a shell command, or a live key:
 | `media` (`action`: playpause, next or previous) | play/pause: the playing track with its cover and a play or pause glyph; next and previous: skip arrows | play/pause toggles, or launches Spotify when it is not running; the others skip |
 | `vpn` (`connection`: a NetworkManager connection name) | on, off or connecting | turns the VPN on or off (`nmcli connection up` / `down`) |
 | `slack` | workspace name and a badge with the number of conversations that have unread messages: red when any are mentions or DMs (plus `@n`), blue otherwise, like Slack's own icon | opens that workspace in Slack |
-| `todo` | number of open to-do items, red when something is overdue, amber when something is due | opens the list as a folder (a set of keys with a back key top left) |
+| `todo` | number of open to-do items, red when something is overdue, amber when something is due, and how long ago the list was last edited | opens the list as a folder (a set of keys with a back key top left) |
 | `counter` (`state`: waiting, running or done) | how many sessions are in that state | shows only that state: bright border on the counter, empty slots and the pager name the filter, and it clears itself when no session is in that state any more; hold on the done counter hides every done session |
 | `pager` (`dir`: prev or next) | page number of the session slots | prev: previous page; hold shows hidden sessions. next: next page; hold starts pin mode (five seconds in which pressing a session key pins or unpins it) |
 | `stats` | percent used of the session, week and model limits, one row each, like Claude Code's usage panel | opens the stats page |
@@ -174,7 +174,10 @@ where the session can be resumed from Claude Code's panel. Pins are kept in
 
 Every key that is about Claude Code (session slots, the counters, the pagers,
 the stats key and the stats tiles) wears a small orange `>_` in its
-bottom-left corner, so they stand out from ordinary buttons.
+bottom-left corner, so they stand out from ordinary buttons. The switch
+"Corner mark" in any of those keys' dialogs turns it off for all of them
+(`"mark": false` under `sessions`), for a board where the mark says nothing
+new.
 
 ### Codex sessions
 
@@ -185,6 +188,12 @@ daemon runs, its open threads are on the board. Waiting means Codex is
 asking you to approve a command, and the second line is its own reason for
 asking ("May I create codex-test.txt in your home directory?"). Press opens
 the folder in VS Code, like a Claude session.
+
+When a 5-hour or weekly window that was 90% used or more resets, the board
+sends a desktop notification ("Claude: session limit reset"); the General
+tab's "Notify when a nearly used-up Claude limit resets" turns that off
+(`"notify": {"resets": false}`). Every reset still sweeps a cyan band across
+the deck.
 
 ### Stats page
 

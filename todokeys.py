@@ -7,6 +7,7 @@ from deckhid import KEY_COUNT, KEY_PX
 from keys import Blank, Key
 from pages import NavKey, back_key, nav
 from render import dim, draw_centered_lines, fit_lines, font, tile
+from sessions import elapsed_text
 from system import launch
 from todo import due_text
 
@@ -51,7 +52,16 @@ class TodoKey(Key):
         img, d, fg = tile(dim(color, 0.35), pressed)
         if not pressed:
             d.rectangle([0, 0, KEY_PX, 4], fill=color)
-        draw_centered_lines(d, [self.cfg.get("title") or "To do"], fg, size=12, top=9)
+        age = elapsed_text(t.mtime) if t.mtime else ""     # how long since the list was last edited
+        age_w = 0
+        if age:
+            f = font(9, False)
+            age_w = int(d.textlength(age, font=f)) + 8
+            d.text((KEY_PX - age_w + 4, 5), age, font=f, fill=(200, 200, 205) if not pressed else fg)
+        avail = KEY_PX - age_w                          # the title centres in the room left of the age
+        lines, size = fit_lines(self.cfg.get("title") or "To do", max_lines=1, sizes=(12, 11, 10), width=avail - 6)
+        f = font(size)
+        d.text((max(3, (avail - d.textlength(lines[0], font=f)) / 2), 9), lines[0], font=f, fill=fg)
         if not t.exists:
             draw_centered_lines(d, ["no file"], fg, size=11, top=40, bold=False)
             return img

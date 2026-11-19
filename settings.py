@@ -350,6 +350,12 @@ class KeyDialog(Adw.Dialog):
         self.cal_warn.set_value(float(k.get("warn_min", DEFAULT_WARN_MIN) or 0))
         group.add(self.cal_warn)
 
+        self.mark_row = Adw.SwitchRow(title="Corner mark (>_) on Claude and Codex keys")
+        self.mark_row.set_subtitle("One setting for every session, counter, pager and stats key. "
+                                   "Off when the mark tells you nothing, say with Claude alone")
+        self.mark_row.set_active(bool(self.window.cfg.get("sessions", {}).get("mark", True)))
+        group.add(self.mark_row)
+
         self.vpn_names = vpn_connections()
         self.vpn_row = Adw.ComboRow(title="Connection")
         self.vpn_row.set_model(Gtk.StringList.new(self.vpn_names or ["no VPN connections in NetworkManager"]))
@@ -417,6 +423,7 @@ class KeyDialog(Adw.Dialog):
         self.run_row.set_visible(kind == "command")
         self.team_row.set_visible(kind == "slack")
         self.vpn_row.set_visible(kind == "vpn")
+        self.mark_row.set_visible(kind in ("session", "stats") or kind.startswith(("counter_", "pager_")))
         self.cal_url.set_visible(kind == "calendar")
         self.cal_warn.set_visible(kind == "calendar")
         for row in (self.todo_file, self.todo_open, self.todo_soon, self.todo_hold):
@@ -442,6 +449,8 @@ class KeyDialog(Adw.Dialog):
         calendar = {"url": self.cal_url.get_text().strip(), "warn_min": int(self.cal_warn.get_value())}
         set_key(self.cfg, self.index, self.kind(), label=label, color=color, run=self.run_row.get_text(),
                 team=team, todo=todo, tiles=tiles, connection=connection, calendar=calendar)
+        if self.mark_row.get_visible():
+            self.window.cfg.setdefault("sessions", {})["mark"] = bool(self.mark_row.get_active())
         self.window.save()
         self.window.refresh_grid()
         self.close()
@@ -576,6 +585,15 @@ class SettingsWindow(Adw.ApplicationWindow):
         page.add(g)
         self.update_saver_rows()
 
+        g = Adw.PreferencesGroup(title="Notifications")
+        self.notify_resets = Adw.SwitchRow(title="Notify when a nearly used-up Claude limit resets")
+        self.notify_resets.set_subtitle("A desktop notification when a 5-hour or weekly window that was "
+                                        "90% used or more opens again. Every reset still sweeps the deck.")
+        self.notify_resets.set_active(bool(self.cfg.get("notify", {}).get("resets", True)))
+        self.notify_resets.connect("notify::active", self.on_notify_resets)
+        g.add(self.notify_resets)
+        page.add(g)
+
         g = Adw.PreferencesGroup(title="Updates")
         self.auto_update = Adw.SwitchRow(title="Install updates automatically")
         self.auto_update.set_subtitle("The tray icon checks GitHub every hour and installs a newer "
@@ -586,6 +604,10 @@ class SettingsWindow(Adw.ApplicationWindow):
         page.add(g)
 
         return page
+
+    def on_notify_resets(self, *_):
+        self.cfg.setdefault("notify", {})["resets"] = self.notify_resets.get_active()
+        self.save_soon()
 
     def on_auto_update(self, *_):
         self.cfg.setdefault("updates", {})["auto"] = self.auto_update.get_active()

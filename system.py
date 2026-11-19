@@ -4,6 +4,7 @@ the login service), shared by the settings window and the tray icon."""
 import ctypes
 import ctypes.util
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -20,6 +21,11 @@ def sh(cmd):
         return subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=3).stdout
     except (OSError, subprocess.SubprocessError):
         return ""
+
+
+def notify(title, body=""):
+    """A desktop notification from the board (notify-send; nothing happens without it)."""
+    launch(f"notify-send -a Deckmate -i deckmate {shlex.quote(title)} {shlex.quote(body)}")
 
 
 def launch(cmd):

@@ -3,6 +3,8 @@ data providers, brightness and the screen saver."""
 import logging
 import os
 
+import render
+import stats
 from calendarkeys import Calendar
 from deckhid import KEY_COUNT
 from folderkeys import Folder
@@ -94,6 +96,8 @@ def build_keys(keys_cfg, ctx, where="keys.json", reserved=()):
 def load_board(path):
     cfg = read_layout(path)
     region = [int(x) for x in cfg.get("sessions", {}).get("keys", []) if 0 <= int(x) < KEY_COUNT]
+    render.SHOW_MARK = bool(cfg.get("sessions", {}).get("mark", True))
+    stats.NOTIFY_RESETS = bool(cfg.get("notify", {}).get("resets", True))
     ctx = BuildContext(path, cfg, len(region))
     keys = build_keys(cfg.get("keys"), ctx)
     for n, idx in enumerate(region):

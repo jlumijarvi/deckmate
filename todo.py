@@ -87,6 +87,7 @@ class TodoList:
         self._key = None
         self.items = []
         self.exists = False
+        self.mtime = None      # when the file was last written
 
     def ensure_file(self):
         if not os.path.exists(self.path):
@@ -102,6 +103,7 @@ class TodoList:
             self.items = []
             return self.items
         self.exists = True
+        self.mtime = st.st_mtime
         key = (st.st_size, st.st_mtime_ns)
         if key == self._key:
             return self.items

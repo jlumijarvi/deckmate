@@ -152,6 +152,10 @@ def age_text(seconds):
     return f"{int(seconds // 86400)} d"
 
 
+NOTIFY_RESETS = True      # "resets" under "notify" in keys.json
+NOTIFY_RESET_PCT = 90     # a window this full (or more) before its reset is worth a notification
+
+
 class Usage:
     """The limits as the board shows them: the live API, Claude Code's cache and
     the desktop app's samples merged, the newest sample winning per limit, plus
@@ -166,11 +170,14 @@ class Usage:
         self.limits = {}          # name -> Limit
         self.new_window = {}      # name -> True from the reset until newer data arrives
         self.reset_events = []    # names whose window ended since the last refresh
+        self.reset_from = {}      # name -> percent used just before that reset
         self._window_end = {}     # name -> the resets_at last seen
+        self._last_used = {}      # name -> the last percent seen while the window ran
         self._started = False
 
     def refresh(self):
         self.reset_events = []
+        self.reset_from = {}
         data = self.cache.read()
         merged = parse_usage_cache((data or {}).get("cachedUsageUtilization") if isinstance(data, dict) else None)
         if self.live is not None:
@@ -190,14 +197,19 @@ class Usage:
             if lim.resets_at and (end is None or lim.resets_at > end + RESET_JITTER_S):
                 if end is not None and self._started and not self.new_window.get(name):
                     self.reset_events.append(name)      # a new window, seen in the data first
+                    self.reset_from[name] = self._last_used.get(name, 0)
                 self._window_end[name] = end = lim.resets_at
                 self.new_window[name] = False
             if end and now >= end and not self.new_window.get(name) and (lim.at or 0) < end - RESET_JITTER_S:
                 self.new_window[name] = True             # the clock passed the end of the window
                 if self._started:
                     self.reset_events.append(name)
+                    self.reset_from[name] = self._last_used.get(name, 0)
             if self.new_window.get(name) and lim.at and end and lim.at >= end:
                 self.new_window[name] = False            # fresh data from after the reset
+        for name, lim in merged.items():
+            if not self.new_window.get(name) and lim.used_pct is not None:
+                self._last_used[name] = lim.used_pct
         self.limits = merged
         self._started = True
 
