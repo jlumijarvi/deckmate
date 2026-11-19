@@ -100,6 +100,7 @@ def write_layout(path, cfg):
     with open(tmp, "w") as f:
         json.dump(cfg, f, indent=2)
         f.write("\n")
+    os.chmod(tmp, 0o600)      # the layout can hold a calendar address or a Slack token
     os.replace(tmp, path)
 
 

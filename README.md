@@ -301,6 +301,21 @@ of Slack's own icon: red when any of them are mentions or DMs (`@n` says how
 many), blue when only channels are unread, grey when nothing is. Nothing is
 written to Slack's files and no Slack login is used.
 
+Slack's state file knows only the totals, not which conversation is unread.
+To have the key name it, give it a Slack user token: at
+[api.slack.com/apps](https://api.slack.com/apps) create an app from
+scratch in your workspace, under *OAuth & Permissions* add the **User Token
+Scopes** `channels:read`, `groups:read`, `im:read`, `mpim:read` and
+`users:read`, install the app to the workspace and copy the *User OAuth
+Token* (`xoxp-…`) into the key's dialog. The caption under the badge then
+names the unread conversation (`#general`, `@anna`), or the one with the
+oldest unread message plus how many others (`#general +2`). While the token
+is set, Deckmate asks Slack about each of your conversations once a minute
+whenever the state file says something is unread (at most 80
+conversations; it backs off when Slack rate-limits). The token is stored in
+`keys.json`, which Deckmate writes readable by your user only; treat it
+like a password, and revoke it from the app's page if it leaks.
+
 ## Screen saver
 
 After `timeout_min` minutes without a key press the deck shows either a big
@@ -333,6 +348,7 @@ is updated. Everything is read-only; nothing is sent anywhere.
 | codex sessions | the rollout files under `~/.codex/sessions/`, matched to running `codex` client processes by folder and start time (the file is named with the client's start), their tail (`task_started`, `task_complete`, a tool call with `require_escalated` and no output = approval prompt, `token_count` for the context bar) and `~/.codex/session_index.jsonl` for the thread name | a Codex release that changes the rollout events or naming; sessions then show as done or vanish. A client that has not prompted yet has no rollout and is not shown |
 | stats page, stats key | Anthropic's usage API (`/api/oauth/usage`, the call Claude Code's panel makes) with the login token from `~/.claude/.credentials.json`; fallbacks: `cachedUsageUtilization` in `~/.claude.json` and `~/.config/Claude/plan-usage-history.json` from the desktop app, newest wins; tokens are summed from the transcripts above since local midnight | no login or the call fails (the fallbacks lag and grey out with their age), or the token file or API reply changes shape |
 | calendar | the `.ics` feed at the key's `url`, fetched every five minutes and cached in `~/.cache/deckmate/`; repeating events are expanded by Deckmate itself | the address stops working (Google lets you reset it); the key says "offline" until the next successful fetch, and a rule part Deckmate does not know (BYSETPOS, BYHOUR) makes that event's instances land on the wrong days |
+| slack (channel name) | with a user token on the key: Slack's Web API, `users.conversations` for the list and `conversations.info` per conversation for `unread_count_display` and `last_read` | a revoked token or missing scopes (`invalid_auth`, `missing_scope` in the log); the caption falls back to the workspace name |
 | slack | `root-state.json` under `~/snap/slack/`, `~/.config/Slack/` or the flatpak folder, which holds per-workspace unread totals (so a per-channel badge is not possible) | a Slack update that moves or restructures the file; the key shows "no data" |
 | media | the player's MPRIS properties on the session D-Bus (PlaybackStatus, Metadata), plus one https fetch per cover | the player is not running (the key says so) or drops MPRIS; Spotify leaves the artist empty for podcasts |
 | vpn | `nmcli connection show`, polled once a second; NetworkManager lets the user at the active seat switch connections without a password | a VPN set up outside NetworkManager (OpenVPN by hand, Tailscale) is not seen; the key then says "not found" |

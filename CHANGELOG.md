@@ -9,6 +9,9 @@ release notes on GitHub. Dates are the release dates.
   (#19).
 - A desktop notification when a 5-hour or weekly Claude window that was
   90% used or more resets; switch in the General tab (#20).
+- Slack key: with a Slack user token on the key (optional, from a Slack app
+  of your own), the caption names the unread conversation, or the one with
+  the oldest unread message plus how many others (#21).
 - The `>_` corner mark on Claude and Codex keys can be turned off from any
   of those keys' dialogs, for a board that only ever shows Claude (#22).
 

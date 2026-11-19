@@ -44,6 +44,7 @@ logs to stdout and to `~/.local/state/deckmate/deck.log`.
 | `stats.py`, `claudeusage.py` | the plan limits (live API, Claude Code's cache, desktop app, newest wins) and the token tally for the stats page |
 | `gitinfo.py` | git state of session folders, in a background thread |
 | `slackstate.py` | reads Slack's local state file for the unread badge |
+| `slackapi.py` | optional: which conversation is unread, from Slack's Web API with a user token |
 | `todo.py` | parses and watches the Markdown to-do list |
 | `system.py` | shell helpers and which account owns the screen (logind) |
 | `paths.py` | where config, state, pid and log files live; migration from the old name |

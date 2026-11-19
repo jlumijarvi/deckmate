@@ -127,7 +127,7 @@ def key_kind(cfg, i):
 
 
 def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None, tiles=None, connection=None,
-            calendar=None):
+            calendar=None, token=None):
     keys = cfg.setdefault("keys", {})
     sess = [s for s in session_keys(cfg) if s != i]
     old = keys.pop(str(i), None) or {}
@@ -143,7 +143,7 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
     elif kind == "calendar":
         keys[str(i)] = {"type": "calendar", **(calendar or {})}
     elif kind == "slack":
-        keys[str(i)] = {"type": "slack", **({"team": team} if team else {})}
+        keys[str(i)] = {"type": "slack", **({"team": team} if team else {}), **({"token": token} if token else {})}
     elif kind == "todo":
         keys[str(i)] = {"type": "todo", **(todo or {})}
     elif kind == "stats":
@@ -170,6 +170,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
     new = keys.get(str(i))
     if new is not None and old and old.get("type", "command") == new.get("type", "command"):
         keys[str(i)] = {**old, **new}      # keep fields the dialog does not show (steps, step, player, ...)
+        if kind == "slack" and token == "":
+            keys[str(i)].pop("token", None)    # the field was cleared on purpose
     if sess or "sessions" in cfg:   # a folder has no session slots: do not give it a "sessions" entry
         cfg.setdefault("sessions", {})["keys"] = sorted(sess)
     cfg["keys"] = {k: keys[k] for k in sorted(keys, key=int)}
@@ -356,6 +358,17 @@ class KeyDialog(Adw.Dialog):
         self.mark_row.set_active(bool(self.window.cfg.get("sessions", {}).get("mark", True)))
         group.add(self.mark_row)
 
+        self.token_row = Adw.PasswordEntryRow(title="Slack user token (optional)")
+        self.token_row.set_text(k.get("token", ""))
+        group.add(self.token_row)
+        self.token_hint = Gtk.Label(xalign=0, wrap=True, css_classes=["dim-label", "caption"],
+                                    margin_start=12, margin_end=12, margin_bottom=6,
+                                    label="With a token the key names the unread conversation. Make a Slack app "
+                                          "with the user scopes channels:read, groups:read, im:read, mpim:read, "
+                                          "users:read, install it, paste its User OAuth Token (xoxp-…). "
+                                          "It is stored in keys.json.")
+        group.add(self.token_hint)
+
         self.vpn_names = vpn_connections()
         self.vpn_row = Adw.ComboRow(title="Connection")
         self.vpn_row.set_model(Gtk.StringList.new(self.vpn_names or ["no VPN connections in NetworkManager"]))
@@ -422,6 +435,8 @@ class KeyDialog(Adw.Dialog):
         self.open_row.set_visible(kind == "folder" and self.is_folder)
         self.run_row.set_visible(kind == "command")
         self.team_row.set_visible(kind == "slack")
+        self.token_row.set_visible(kind == "slack")
+        self.token_hint.set_visible(kind == "slack")
         self.vpn_row.set_visible(kind == "vpn")
         self.mark_row.set_visible(kind in ("session", "stats") or kind.startswith(("counter_", "pager_")))
         self.cal_url.set_visible(kind == "calendar")
@@ -448,7 +463,8 @@ class KeyDialog(Adw.Dialog):
         connection = self.vpn_names[self.vpn_row.get_selected()] if self.vpn_names else None
         calendar = {"url": self.cal_url.get_text().strip(), "warn_min": int(self.cal_warn.get_value())}
         set_key(self.cfg, self.index, self.kind(), label=label, color=color, run=self.run_row.get_text(),
-                team=team, todo=todo, tiles=tiles, connection=connection, calendar=calendar)
+                team=team, todo=todo, tiles=tiles, connection=connection, calendar=calendar,
+                token=self.token_row.get_text().strip())
         if self.mark_row.get_visible():
             self.window.cfg.setdefault("sessions", {})["mark"] = bool(self.mark_row.get_active())
         self.window.save()

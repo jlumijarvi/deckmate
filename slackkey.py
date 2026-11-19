@@ -4,6 +4,7 @@ from PIL import Image
 from deckhid import KEY_PX
 from keys import Key
 from render import draw_centered_lines, fit_lines, font, tile
+from slackapi import caption, slack_api
 from slackstate import SNAP_ICON, SlackState
 from system import launch
 
@@ -37,6 +38,11 @@ class Slack(Key):
     blue otherwise, grey when nothing is unread."""
     dynamic = True
     _logo = None
+
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        token = (cfg.get("token") or "").strip()
+        self.api = slack_api(token) if token else None    # names the unread conversation; optional
 
     def workspace(self):
         state = slack_state()
@@ -82,8 +88,14 @@ class Slack(Key):
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=badge if not pressed else (0, 0, 0))
         box = f.getbbox(text)
         d.text((cx - w / 2, cy - (box[3] - box[1]) / 2 - box[1]), text, font=f, fill=(255, 255, 255))
-        # the name is a caption under the badge, not a title: small and quiet
-        lines, size = fit_lines(ws["name"], max_lines=1, sizes=(10, 9))
+        # the caption under the badge: the unread conversation when the API names one, else the workspace
+        text = ws["name"]
+        if self.api is not None:
+            self.api.wanted = bool(unread)
+            named = caption(self.api.unreads()) if unread else ""
+            if named:
+                text = named
+        lines, size = fit_lines(text, max_lines=1, sizes=(10, 9))
         name_fg = (210, 200, 215) if not pressed else fg
         if mentions:   # mentions line in the middle, the name on the bottom edge
             d.text((6, 35), f"@{mentions}", font=font(12), fill=(255, 200, 80) if not pressed else fg)
