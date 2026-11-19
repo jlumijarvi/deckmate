@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.12.2 (2026-11-19)
 
 - Test fixtures and samples use plainly made-up names.
 
