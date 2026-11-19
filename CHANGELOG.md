@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.12.1 (2026-11-19)
 
 - For developing: `./dev.sh start` runs the checkout on the deck in place
   of the installed package (`stop` puts it back); `--fakes` answers Slack,
