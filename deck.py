@@ -217,6 +217,7 @@ def main():
                         lim = usage.limits.get(name)
                         notify(f"Claude: {lim.label if lim else name} limit reset",
                                f"That window was {before}% used; it is open again.")
+                        log.info(f"notified: {name} limit reset, was {before}% used")
         if nav.dirty:
             nav.dirty = False
             sent = [None] * KEY_COUNT
