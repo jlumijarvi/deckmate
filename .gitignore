@@ -5,3 +5,6 @@ references/
 dist/
 .coverage
 coverage-report.json
+
+# The project board's generated data (python3 tools/board.py); the page itself is kept.
+tools/board/data/

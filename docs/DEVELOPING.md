@@ -86,6 +86,7 @@ shows a board with every such key on it instead of your own layout.
 | `tests/` | unit tests, `python3 -m unittest discover -s tests` |
 | `build_deb.sh`, `packaging/`, `data/` | the Debian package, desktop files, icons, polkit action, systemd unit |
 | `release.sh`, `changelog.sh`, `CHANGELOG.md` | releasing |
+| `tools/board.py`, `tools/board/page/` | the project board (a Claude Artifact dashboard): the script writes the issues, commits, days, releases, key types and checks as JSON under `tools/board/data/` (ignored), which are uploaded to the board by hand; the page is kept beside it |
 | `.github/workflows/ci.yml` | lint, tests, package build and release publishing on GitHub |
 
 The GTK 3 tray and the GTK 4 settings window cannot share a process, which is

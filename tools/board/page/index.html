@@ -1,0 +1,280 @@
+<meta name="dash-one-writer">
+<style>
+  .db { display: grid; gap: var(--cds-gap-lg); }
+  .db h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; }
+  .db h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-sm); }
+  .db .db-lede { color: var(--color-fg-muted); margin: var(--cds-gap-xs) 0 0; max-width: 70ch; }
+  .db .db-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--cds-gap-md); }
+  .db .db-tile { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: grid; gap: var(--cds-gap-xs); }
+  .db .db-tile b { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .db .db-tile span { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+  .db .db-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--cds-gap-lg); }
+  .db .db-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+  .db .db-table { overflow-x: auto; }
+  .db table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  .db th, .db td { text-align: left; padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+  .db th { color: var(--color-fg-muted); font-weight: var(--cds-font-weight-medium); font-size: var(--cds-font-size-caption); white-space: nowrap; }
+  .db td.db-num { white-space: nowrap; }
+  .db td.db-r, .db th.db-r { text-align: right; }
+  .db td code { font-size: var(--cds-font-size-caption); }
+  .db a { color: inherit; }
+  .db .db-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: var(--cds-font-size-caption); border: 1px solid var(--color-border-line); white-space: nowrap; }
+  .db .db-pill[data-state="open"] { border-color: var(--color-warn); color: var(--color-warn); }
+  .db .db-pill[data-state="closed"] { border-color: var(--color-ok); color: var(--color-ok); }
+  .db .db-controls { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; margin-bottom: var(--cds-gap-sm); }
+  .db .db-controls label { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+  .db ol { margin: 0; padding-left: 1.4em; display: grid; gap: var(--cds-gap-xs); }
+  .db .db-muted { color: var(--color-fg-muted); }
+  .db .db-days { min-height: 120px; }
+  .db .db-days svg text { font-size: var(--cds-font-size-caption); fill: var(--cds-text-secondary); }
+  .db .db-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); white-space: nowrap; }
+  .db .db-rel { position: relative; }
+</style>
+
+<div class="db" id="board">
+  <header>
+    <h1 id="title">deckmate board</h1>
+    <p class="db-lede">Version <b data-draw="n-version" data-source="checks" data-field="value" data-where="metric=version">—</b>, <b data-draw="n-releases" data-source="release-count">—</b> releases since the first commit on <span data-draw="first-day" data-source="first-day">—</span>. Open: <b data-draw="n-open" data-source="open-count">—</b> issues, <b data-draw="n-closed" data-source="closed-count">—</b> closed. Last commit <span data-draw="last-day" data-source="days" data-field="date" data-row="0">—</span>. Data as of <span data-draw="made-at" data-source="issues">—</span>.</p>
+  </header>
+
+  <section class="db-tiles" id="tiles" aria-label="Counts">
+    <div class="db-tile"><b data-draw="t-open" data-source="open-count">—</b><span>open issues</span></div>
+    <div class="db-tile"><b data-draw="t-closed" data-source="closed-count">—</b><span>issues closed</span></div>
+    <div class="db-tile"><b data-draw="t-releases" data-source="release-count">—</b><span>releases</span></div>
+    <div class="db-tile"><b data-draw="t-commits30" data-source="commits-30">—</b><span>commits in the last 30 days</span></div>
+    <div class="db-tile"><b data-draw="t-tests" data-source="checks" data-field="value" data-where="metric=tests">—</b><span>tests, all passing</span></div>
+    <div class="db-tile"><b data-draw="t-coverage" data-source="checks" data-field="value" data-where="metric=coverage">—</b><span>% of lines covered</span></div>
+  </section>
+
+  <section class="db-two">
+    <div class="db-card" id="releases">
+      <h2>Latest releases</h2>
+      <p class="db-muted">The newest ten, each with the first line of its changelog section.</p>
+      <ol data-draw="release-list" data-source="releases"></ol>
+    </div>
+    <div class="db-card" id="checks">
+      <h2>Checks</h2>
+      <p class="db-muted">From the last run of tools/board.py in the repo.</p>
+      <div class="db-table">
+        <table data-source="checks" data-row-key="metric">
+          <thead><tr><th data-field="metric">Metric</th><th data-field="value" class="db-r">Value</th><th data-field="detail">Detail</th></tr></thead>
+          <tbody data-draw="check-rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="db-card" id="issues">
+    <h2>Issues</h2>
+    <div class="db-controls">
+      <label for="f-state">State</label>
+      <select class="dash-select" id="f-state" aria-label="State">
+        <option value="">All</option>
+        <option value="open">Open</option>
+        <option value="closed">Closed</option>
+      </select>
+      <span class="db-muted" data-draw="issue-count">—</span>
+    </div>
+    <div class="db-table">
+      <table data-source="issues" data-row-key="number">
+        <thead><tr>
+          <th data-field="number">#</th>
+          <th data-field="title">Title</th>
+          <th data-field="state">State</th>
+          <th data-field="created">Opened</th>
+          <th data-field="closed">Closed</th>
+          <th data-field="days_open" class="db-r">Days open</th>
+        </tr></thead>
+        <tbody data-draw="issue-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="db-two">
+    <div class="db-card" id="days">
+      <h2>Days worked</h2>
+      <p class="db-muted">Commits on main per day, the last eight weeks. Point at a bar for the day.</p>
+      <div class="db-rel db-days" data-draw="days-chart" data-source="days"></div>
+      <div class="db-table">
+        <table data-source="days" data-row-key="date">
+          <thead><tr><th data-field="date">Day</th><th data-field="commits" class="db-r">Commits</th><th data-field="issues_closed" class="db-r">Closed</th><th data-field="releases" class="db-r">Releases</th><th data-field="first_commit">First commit</th></tr></thead>
+          <tbody data-draw="day-rows"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="db-card" id="keys">
+      <h2>Key types</h2>
+      <p class="db-muted">What each kind of key shows and does, as the README states it.</p>
+      <div class="db-table">
+        <table data-source="keys" data-row-key="type">
+          <thead><tr><th data-field="type">Type</th><th data-field="shows">Shows</th><th data-field="press">Press</th></tr></thead>
+          <tbody data-draw="key-rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  const daysAgo = (n) => { const d = new Date(); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+
+  dash.calc('open-count', { inputs: ['issues'], title: 'Open issues', description: 'Issues whose state is open.',
+    fn: (issues) => issues.filter((i) => i.state === 'open').length });
+  dash.calc('closed-count', { inputs: ['issues'], title: 'Closed issues', description: 'Issues whose state is closed.',
+    fn: (issues) => issues.filter((i) => i.state === 'closed').length });
+  dash.calc('release-count', { inputs: ['releases'], title: 'Releases', description: 'Released sections of the changelog.',
+    fn: (releases) => releases.length });
+  dash.calc('commits-30', { inputs: ['commits'], title: 'Commits in 30 days', description: 'Commits on main dated in the last 30 days.',
+    fn: (commits) => { const since = daysAgo(30); return commits.filter((c) => c.date >= since).length; } });
+  dash.calc('first-day', { inputs: ['days'], title: 'First day', description: 'The oldest day with a commit on main.',
+    fn: (days) => days.length ? days[days.length - 1].date : '' });
+
+  const link = (url, text) => {
+    const a = document.createElement('a');
+    if (/^https:\/\/github\.com\//.test(url)) { a.href = url; a.target = '_blank'; a.rel = 'noopener'; }
+    a.textContent = text;
+    return a;
+  };
+  const pill = (state) => { const s = document.createElement('span'); s.className = 'db-pill'; s.dataset.state = state; s.textContent = state; return s; };
+  const td = (tr, content, cls) => { const c = tr.insertCell(); if (cls) c.className = cls; if (content instanceof Node) c.append(content); else c.textContent = content ?? ''; return c; };
+  const number = (name, id) => dash.draw(name, (el) => { const d = dash.data(id); el.textContent = d.status === 'ok' ? String(d.data) : '—'; });
+  const checkValue = (name, metric) => dash.draw(name, (el) => {
+    const d = dash.data('checks');
+    const row = d.status === 'ok' ? d.data.find((r) => r.metric === metric) : null;
+    el.textContent = row && row.value !== null ? String(row.value) : '—';
+  });
+
+  for (const [name, id] of [['n-open', 'open-count'], ['t-open', 'open-count'], ['n-closed', 'closed-count'], ['t-closed', 'closed-count'], ['n-releases', 'release-count'], ['t-releases', 'release-count'], ['t-commits30', 'commits-30'], ['first-day', 'first-day']]) number(name, id);
+  checkValue('n-version', 'version');
+  checkValue('t-tests', 'tests');
+  checkValue('t-coverage', 'coverage');
+
+  dash.draw('last-day', (el) => { const d = dash.data('days'); el.textContent = d.status === 'ok' && d.data[0] ? d.data[0].date : '—'; });
+  dash.draw('made-at', (el) => {
+    const d = dash.data('issues');
+    const made = d.status === 'ok' && d.meta ? d.meta.find((m) => m.label === 'Made') : null;
+    el.textContent = made ? made.value.slice(0, 16).replace('T', ' ') + ' UTC' : '—';
+  });
+
+  dash.draw('release-list', (ol) => {
+    const d = dash.data('releases');
+    ol.replaceChildren();
+    if (d.status !== 'ok') { ol.append(Object.assign(document.createElement('li'), { textContent: '—' })); return; }
+    for (const r of d.data.slice(0, 10)) {
+      const li = document.createElement('li');
+      li.dataset.source = 'releases'; li.dataset.field = 'highlight'; li.dataset.where = 'version=' + r.version;
+      li.append(link(r.url, 'v' + r.version), ' ', Object.assign(document.createElement('span'), { className: 'db-muted', textContent: r.date + (r.issues ? ' · #' + r.issues.split(' ').join(' #') : '') }));
+      li.append(document.createElement('br'), r.highlight);
+      ol.append(li);
+    }
+  });
+
+  dash.draw('check-rows', (tbody) => {
+    tbody.replaceChildren();
+    const d = dash.data('checks');
+    if (d.status !== 'ok') return;
+    for (const r of d.data) {
+      const tr = tbody.insertRow();
+      tr.dataset.key = r.metric;
+      td(tr, r.metric);
+      td(tr, r.value === null ? '' : String(r.value), 'db-r');
+      td(tr, r.detail);
+    }
+  });
+
+  const stateFilter = () => document.querySelector('#f-state')?.value ?? '';
+  for (const sel of document.querySelectorAll('#f-state')) sel.addEventListener('change', () => { dash.draw('issue-rows'); dash.draw('issue-count'); });
+  const issueRows = () => {
+    const d = dash.data('issues');
+    if (d.status !== 'ok') return null;
+    const f = stateFilter();
+    return d.data.filter((i) => !f || i.state === f).sort((a, b) => b.number - a.number);
+  };
+  dash.draw('issue-count', (el) => { const rows = issueRows(); el.textContent = rows ? rows.length + ' shown' : '—'; });
+  dash.draw('issue-rows', (tbody) => {
+    tbody.replaceChildren();
+    const rows = issueRows();
+    if (!rows) return;
+    for (const i of rows) {
+      const tr = tbody.insertRow();
+      tr.dataset.key = String(i.number);
+      td(tr, link(i.url, '#' + i.number), 'db-num');
+      td(tr, i.title);
+      td(tr, pill(i.state));
+      td(tr, i.created, 'db-num');
+      td(tr, i.closed ?? '', 'db-num');
+      td(tr, String(i.days_open), 'db-r');
+    }
+  });
+
+  dash.draw('day-rows', (tbody) => {
+    tbody.replaceChildren();
+    const d = dash.data('days');
+    if (d.status !== 'ok') return;
+    for (const day of d.data.slice(0, 10)) {
+      const tr = tbody.insertRow();
+      tr.dataset.key = day.date;
+      td(tr, day.date, 'db-num');
+      td(tr, String(day.commits), 'db-r');
+      td(tr, String(day.issues_closed), 'db-r');
+      td(tr, String(day.releases), 'db-r');
+      td(tr, day.first_commit);
+    }
+  });
+
+  dash.draw('key-rows', (tbody) => {
+    tbody.replaceChildren();
+    const d = dash.data('keys');
+    if (d.status !== 'ok') return;
+    for (const r of d.data) {
+      const tr = tbody.insertRow();
+      tr.dataset.key = r.type;
+      const code = document.createElement('code'); code.textContent = r.type;
+      td(tr, code);
+      td(tr, r.shows);
+      td(tr, r.press);
+    }
+  });
+
+  dash.draw('days-chart', (el) => {
+    el.replaceChildren();
+    const d = dash.data('days');
+    if (d.status !== 'ok') { el.textContent = '—'; return; }
+    const byDate = new Map(d.data.map((r) => [r.date, r]));
+    const dates = [];
+    for (let i = 56; i >= 0; i--) dates.push(daysAgo(i));
+    const rows = dates.map((date) => ({ date, commits: byDate.get(date)?.commits ?? 0, closed: byDate.get(date)?.issues_closed ?? 0, releases: byDate.get(date)?.releases ?? 0 }));
+    const width = el.clientWidth || 320, height = 120, m = { top: 8, right: 8, bottom: 22, left: 28 };
+    const max = Math.max(1, d3.max(rows, (r) => r.commits));
+    const y = d3.scaleLinear().domain([0, max]).nice().range([height - m.bottom, m.top]);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${width} ${height}`).attr('role', 'img')
+      .attr('aria-label', `Commits per day over the last eight weeks, at most ${max} in a day`);
+    // the y axis first: its widest tick label sets the left margin, as drawn
+    const yAxis = svg.append('g').call(d3.axisLeft(y).ticks(Math.min(4, max)).tickFormat(d3.format('d')))
+      .call((g) => g.selectAll('line, path').attr('stroke', 'var(--cds-chart-axis)'));
+    let widest = 0;
+    yAxis.selectAll('text').each(function () { widest = Math.max(widest, this.getComputedTextLength()); });
+    m.left = Math.ceil(widest) + 12;
+    yAxis.attr('transform', `translate(${m.left},0)`);
+    const x = d3.scaleBand().domain(dates).range([m.left, width - m.right]).padding(0.15);
+    const ticks = dates.filter((dt, i) => i % 14 === 0);
+    const xAxis = svg.append('g').attr('transform', `translate(0,${height - m.bottom})`)
+      .call(d3.axisBottom(x).tickValues(ticks).tickFormat((dt) => d3.utcFormat('%-d %b')(new Date(dt))))
+      .call((g) => g.selectAll('line, path').attr('stroke', 'var(--cds-chart-axis)'));
+    // the end labels stay inside the drawing: the first starts at its tick, the last ends at its tick
+    xAxis.selectAll('text').each(function (dt) {
+      if (dt === ticks[0]) d3.select(this).attr('text-anchor', 'start').attr('dx', '-0.3em');
+      if (dt === ticks[ticks.length - 1]) d3.select(this).attr('text-anchor', 'end').attr('dx', '0.3em');
+    });
+    const tip = d3.select(el).append('div').attr('class', 'db-tip').style('display', 'none');
+    svg.append('g').selectAll('rect').data(rows).join('rect')
+      .attr('x', (r) => x(r.date)).attr('y', (r) => y(r.commits)).attr('width', x.bandwidth()).attr('height', (r) => y(0) - y(r.commits))
+      .style('fill', dash.colors[0])
+      .on('pointerenter pointermove', (event, r) => {
+        tip.style('display', 'block').text(`${r.date}: ${r.commits} commit${r.commits === 1 ? '' : 's'}, ${r.closed} closed, ${r.releases} release${r.releases === 1 ? '' : 's'}`);
+        const bx = el.getBoundingClientRect(), left = Math.min(event.clientX - bx.left + 8, Math.max(0, bx.width - 240));
+        tip.style('left', left + 'px').style('top', (event.clientY - bx.top - 28) + 'px');
+      })
+      .on('pointerleave', () => tip.style('display', 'none'));
+  });
+</script>
