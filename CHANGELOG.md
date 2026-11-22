@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.13.0 (2026-11-22)
 
 - Weather key (#23): temperature, conditions and today's high and low for a
   place, from Open-Meteo (no account). Press opens the next hours and the
