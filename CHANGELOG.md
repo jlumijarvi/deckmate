@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.13.2 (2026-11-22)
 
 - Settings: the media key's Player choice "Browser (YouTube)" fits the row.
 
