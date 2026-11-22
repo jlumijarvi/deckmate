@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.13.1 (2026-11-22)
 
 - The tray does not install an update while `./dev.sh start` has the
   checkout's board on the deck (two boards on one deck flicker); it says to
