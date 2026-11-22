@@ -62,7 +62,7 @@ KIND_INDEX = {k: i for i, (k, _) in enumerate(KEY_KINDS)}
 # the "player" of a media key: Spotify, or a browser for YouTube and other tabs
 PLAYERS = [
     ("spotify", "Spotify"),
-    ("browser", "Browser (YouTube, any tab with media)"),
+    ("browser", "Browser (YouTube)"),
     ("firefox", "Firefox"),
     ("chromium", "Chrome or Chromium"),
 ]

@@ -3,6 +3,10 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Settings: the media key's Player choice "Browser (YouTube)" fits the row.
+
 ## 0.13.1 (2026-11-22)
 
 - The tray does not install an update while `./dev.sh start` has the
