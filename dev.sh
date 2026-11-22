@@ -2,7 +2,8 @@
 # Run the checkout on the real deck in place of the installed package, and
 # put the package back afterwards. Everything starts as a transient systemd
 # user unit, so it gets the session's clean environment (a VS Code or snap
-# shell would break GTK) and shows up in journalctl.
+# shell would break GTK) and shows up in journalctl. Stop the dev board
+# before installing a release: the tray refuses to update while it runs.
 #
 #   ./dev.sh start            the checkout's board instead of the installed one
 #   ./dev.sh start --fakes    ... with made-up sessions and canned Slack, usage and calendar
@@ -39,6 +40,8 @@ case "${1:-}" in
         systemd-run --user --quiet --collect --unit="$UNIT" $ENV \
             -p WorkingDirectory="$HERE" /usr/bin/python3 -u "$HERE/deck.py" $ARGS
         echo "dev board running from $HERE${ENV:+ with fakes from $FIXTURES}; ./dev.sh log follows it, ./dev.sh stop puts the package back"
+        echo "NOTE: run ./dev.sh stop before installing a release; the tray will not update while this board runs,"
+        echo "      and a package installed by hand would start the installed board next to this one (two boards on one deck)"
         ;;
     stop)
         systemctl --user stop "$UNIT" 2>/dev/null || true

@@ -120,6 +120,15 @@ def service_loaded():
     return bool(r) and r.stdout.strip() == "loaded"
 
 
+DEV_UNIT = "deckmate-dev.service"    # dev.sh runs the checkout's board under this name
+
+
+def dev_board_active():
+    """True while dev.sh has the checkout's board on the deck. An install must
+    not start the packaged board next to it: two boards on one deck flicker."""
+    return sh(f"systemctl --user is-active {DEV_UNIT}").strip() == "active"
+
+
 def start_board():
     if service_loaded():
         run("systemctl", "--user", "start", SERVICE)

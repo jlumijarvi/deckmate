@@ -23,7 +23,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 from gi.repository import AyatanaAppIndicator3 as AppIndicator  # noqa: E402
 
 from paths import HERE, INSTALLED, REPO, STATUS_FILE, TRAY_PID_FILE, config_path, ensure_dirs, version  # noqa: E402
-from system import (SERVICE, board_pid, claim_pid, release_pid, run,  # noqa: E402
+from system import (SERVICE, board_pid, claim_pid, dev_board_active, release_pid, run,  # noqa: E402
                     service_loaded, start_board, stop_board)
 
 UPDATE_CHECK_S = 3600
@@ -245,6 +245,10 @@ class Tray:
         tag, url, name, via_gh = self.update
         if not os.path.exists(INSTALL_HELPER):        # a git checkout: no helper, no root
             notify(f"Deckmate {tag} is available", f"Install the package by hand: {url}")
+            return
+        if dev_board_active():                        # installing would start the package's board next to it
+            notify(f"Deckmate {tag} not installed", "A dev board is on the deck. Run ./dev.sh stop, then "
+                   "install from the tray menu.")
             return
 
         def work():

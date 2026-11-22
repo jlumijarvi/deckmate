@@ -61,7 +61,7 @@ from pages import nav
 from paths import LOG_FILE, PID_FILE, STATUS_FILE, config_path, ensure_dirs
 from render import CYAN, STATE_COLORS, board_image
 from sessionkeys import SessionSlot
-from system import notify, seat_active_uid
+from system import release_pid, notify, seat_active_uid
 
 log = logging.getLogger("deck")
 RECONNECT_S = 2.0
@@ -404,11 +404,11 @@ def main():
     finally:
         if deck is not None:
             leave_deck(deck, saver)
-        for f in (PID_FILE, STATUS_FILE):
-            try:
-                os.remove(f)
-            except OSError:
-                pass
+        release_pid(PID_FILE)      # only when still ours: a later board (an update's) may have taken over
+        try:
+            os.remove(STATUS_FILE)
+        except OSError:
+            pass
         log.info("bye")
 
 

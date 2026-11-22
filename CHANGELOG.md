@@ -3,6 +3,14 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- The tray does not install an update while `./dev.sh start` has the
+  checkout's board on the deck (two boards on one deck flicker); it says to
+  run `./dev.sh stop` first. `dev.sh start` says so too.
+- A board that quits no longer deletes the pid file of a board that started
+  after it (the tray then said "not running" while the updated board ran).
+
 ## 0.13.0 (2026-11-22)
 
 - Weather key (#23): temperature, conditions and today's high and low for a
