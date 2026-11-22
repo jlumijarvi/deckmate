@@ -121,7 +121,8 @@ def main():
     ap.add_argument("--preview", metavar="PNG", help="save the board as an image once painted")
     ap.add_argument("--demo", action="store_true", help="show made-up sessions in every state")
     ap.add_argument("--saver", action="store_true", help="start in screen-saver mode")
-    ap.add_argument("--fakes", metavar="DIR", help="answer Slack, the usage API and the calendar from files in DIR")
+    ap.add_argument("--fakes", metavar="DIR",
+                    help="answer Slack, the usage API, the calendar and the weather from files in DIR")
     args = ap.parse_args()
     sessionkeys.DEMO = args.demo
     if args.fakes:

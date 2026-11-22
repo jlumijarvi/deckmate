@@ -10,6 +10,7 @@ import claudeusage  # noqa: E402
 import fakes  # noqa: E402
 import slackapi  # noqa: E402
 import slackstate  # noqa: E402
+import weather  # noqa: E402
 
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
 
@@ -71,6 +72,23 @@ class SourcesTest(unittest.TestCase):
         events = calfeed.parse_ics(text)
         today = calfeed.occurrences(events, datetime.now().astimezone().date())
         self.assertIn("Planning with the platform team", [o.summary for o in today])
+
+    def test_weather(self):
+        import tempfile
+        self.assertEqual(weather.fetch(0, 0)["timezone"], "Europe/Helsinki")
+        self.assertEqual(weather.geocode("Anywhere"), (60.16998, 24.945206, "Anywhere"))
+        with tempfile.TemporaryDirectory() as tmp:
+            cache, weather.CACHE_DIR = weather.CACHE_DIR, tmp
+            try:
+                w = weather.Weather("Anywhere", start=False)
+                self.assertEqual(w._round(), weather.POLL_S)
+            finally:
+                weather.CACHE_DIR = cache
+        fc = w.forecast()
+        now = datetime.now(fc.tz)
+        self.assertEqual(fc.current.time.replace(minute=0), now.replace(minute=0, second=0, microsecond=0))
+        self.assertEqual(len(fc.next_hours(now, 7)), 7)
+        self.assertEqual(fc.coming_days(now.date())[0].date, now.date())
 
 
 if __name__ == "__main__":

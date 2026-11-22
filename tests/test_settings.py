@@ -42,7 +42,8 @@ class SetKeyTest(unittest.TestCase):
             for kind, _ in KEY_KINDS:
                 cfg = {"keys": {}}
                 set_key(cfg, 1, kind, label="T", color="#112233", run="true", team="T1", todo=todo,
-                        tiles=["tokens"], connection="Office", calendar={"url": "", "warn_min": 5}, token="")
+                        tiles=["tokens"], connection="Office", calendar={"url": "", "warn_min": 5}, token="",
+                        weather={"place": "60.17, 24.94", "units": "celsius"}, player="browser")
                 self.assertEqual(key_kind(cfg, 1)[0], kind, kind)
                 path = os.path.join(tmp, "keys.json")
                 with open(path, "w") as f:
@@ -63,6 +64,24 @@ class SetKeyTest(unittest.TestCase):
         self.assertEqual(cfg["keys"]["2"]["player"], "chromium")
         set_key(cfg, 2, "clock")                      # a new type starts clean
         self.assertEqual(cfg["keys"]["2"], {"type": "clock"})
+
+    def test_media_player_and_weather_fields(self):
+        cfg = {"keys": {"2": {"type": "media", "action": "next", "player": "chromium"}}}
+        set_key(cfg, 2, "media_next", player="browser")
+        self.assertEqual(cfg["keys"]["2"], {"type": "media", "action": "next", "player": "browser"})
+        self.assertEqual(key_summary(cfg, 2), "Browser\nnext")
+        set_key(cfg, 2, "media_next", player="spotify")                  # the default is not written
+        self.assertEqual(cfg["keys"]["2"], {"type": "media", "action": "next"})
+        self.assertEqual(key_summary(cfg, 2), "Spotify\nnext")
+        cfg = {"keys": {"1": {"type": "weather", "lat": 60.17, "lon": 24.94, "open": "https://x"}}}
+        self.assertEqual(key_summary(cfg, 1), "Weather\nset")
+        set_key(cfg, 1, "weather", label="Home", weather={"place": "Oulu", "units": "fahrenheit"})
+        self.assertEqual(cfg["keys"]["1"], {"type": "weather", "place": "Oulu", "units": "fahrenheit",
+                                            "title": "Home", "open": "https://x"})   # lat/lon gone, open kept
+        self.assertEqual(key_summary(cfg, 1), "Weather\nHome")
+        set_key(cfg, 1, "weather", label="", weather={"place": "Oulu", "units": "celsius"})
+        self.assertNotIn("title", cfg["keys"]["1"])
+        self.assertEqual(key_summary(cfg, 1), "Weather\nOulu")
 
     def test_default_todo_file_stays_implicit(self):
         cfg = {"keys": {}}

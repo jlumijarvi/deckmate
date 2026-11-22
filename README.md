@@ -8,8 +8,8 @@ A small Python program that drives an Elgato Stream Deck (Original V2 or MK.2,
 It talks the deck's stock USB HID protocol through `/dev/hidraw*`. Besides
 plain buttons, folders, a clock and audio keys it shows one key per running
 Claude Code session with its state and your plan limits, a to-do list, a
-Spotify key with the cover, a Slack unread badge, a VPN switch and a screen
-saver. A settings window and a top-bar icon come with it.
+calendar, the weather, a Spotify or YouTube key with the cover, a Slack
+unread badge, a VPN switch and a screen saver. A settings window and a top-bar icon come with it.
 
 Until 0.6 the project was called stream-deck; the package replaces the old
 one and copies your settings over on first start.
@@ -108,10 +108,11 @@ a plain button with a shell command, or a live key:
 | `folder` | its title, with a small folder tab | opens the folder: its own `keys` map, key 0 is the back key (press: one level up, hold: the main board) |
 | `clock` | time and date | nothing |
 | `calendar` (`url`: an iCalendar feed) | time and date, and the next meeting today: its start, or "now" and its end; red when it starts within `warn_min` minutes | opens the meeting's link when it is on or about to start, otherwise the calendar in the browser; hold opens today's meetings as a folder |
+| `weather` (`place`: a town, or "lat, lon") | temperature and conditions now, today's high and low | opens a folder with the next hours and the coming ten days; hold opens the forecast in the browser |
 | `mute` | mic or speaker, on or MUTED | toggles it (PipeWire, `wpctl`) |
 | `volume` | speaker volume | changes it by `step` percent |
 | `brightness` | the deck's brightness | steps it 30 / 60 / 100 (or the key's `steps` list), written to keys.json |
-| `media` (`action`: playpause, next or previous) | play/pause: the playing track with its cover and a play or pause glyph; next and previous: skip arrows | play/pause toggles, or launches Spotify when it is not running; the others skip |
+| `media` (`action`: playpause, next or previous; `player`: spotify or browser) | play/pause: the playing track with its cover and a play or pause glyph; next and previous: skip arrows | play/pause toggles, or launches Spotify (or opens YouTube for a browser) when nothing is playing; the others skip |
 | `vpn` (`connection`: a NetworkManager connection name) | on, off or connecting | turns the VPN on or off (`nmcli connection up` / `down`) |
 | `slack` | workspace name and a badge with the number of conversations that have unread messages: red when any are mentions or DMs (plus `@n`), blue otherwise, like Slack's own icon | opens that workspace in Slack |
 | `todo` | number of open to-do items, red when something is overdue, amber when something is due, and how long ago the list was last edited | opens the list as a folder (a set of keys with a back key top left) |
@@ -282,15 +283,43 @@ yearly, with intervals, counts, end dates, weekday lists and exceptions), and
 an instance that was moved or edited replaces the regular one, so the key
 shows what Google shows. Time zones follow the feed; the key shows local time.
 
-## Spotify
+## Weather
+
+The `weather` key shows the weather for one place from
+[Open-Meteo](https://open-meteo.com/), which needs no account or key. Give
+the key a `place`: a town name (looked up once through Open-Meteo's geocoding
+service, which takes the usual spellings) or coordinates as `"60.17, 24.94"`.
+Nothing but the coordinates is sent anywhere, and only to Open-Meteo. The
+forecast is fetched every fifteen minutes and kept in `~/.cache/deckmate/`,
+so the key works right after a start; while the network is down it shows the
+last forecast and says "offline" once that is an hour old. `"units":
+"fahrenheit"` switches from Celsius; `"title"` replaces the condition text,
+for two keys with two places.
+
+The key shows a glyph for the conditions (sun or moon, clouds, fog, rain,
+sleet, snow, thunder), the temperature, the condition in words and today's
+high and low. Pressing it opens a folder: the back key and the next four
+hours on the top row, each with its temperature and the chance of rain, and
+the coming ten days with their highs and lows on the two rows below. Holding
+it opens the forecast on yr.no in the browser (`"open"` on the key replaces
+that address).
+
+## Spotify and YouTube
 
 The `media` keys talk to the Spotify app over MPRIS, the media-player
 interface on the session D-Bus that GNOME's own media controls use. Nothing
 is sent to Spotify's servers except the one fetch of the cover picture, which
-is cached per track. No Spotify login or API key is involved. `"player"` names
-another MPRIS player instead, for example `"chromium"`, since the interface is
-the same for all of them; the settings window calls the keys Spotify because
-that is the player they were made for.
+is cached per track. No Spotify login or API key is involved.
+
+With `"player": "browser"` (the settings window's "Browser") the same keys
+control whatever tab is playing in Firefox, Chrome or Chromium: YouTube, a
+podcast page, a radio stream. The key shows the video's title and channel
+with its thumbnail, pausing and skipping work the way the tab's own controls
+do, and when no tab is playing the key says so and a press opens YouTube.
+Browsers publish a player only while a tab has media, and with several tabs
+or browsers the one playing wins. `"player": "firefox"` or `"chromium"` picks
+one browser (Chrome calls itself chromium); any other MPRIS player works by
+its bus name, for example `"vlc"`.
 
 ## Slack
 
@@ -348,9 +377,10 @@ is updated. Everything is read-only; nothing is sent anywhere.
 | codex sessions | the rollout files under `~/.codex/sessions/`, matched to running `codex` client processes by folder and start time (the file is named with the client's start), their tail (`task_started`, `task_complete`, a tool call with `require_escalated` and no output = approval prompt, `token_count` for the context bar) and `~/.codex/session_index.jsonl` for the thread name | a Codex release that changes the rollout events or naming; sessions then show as done or vanish. A client that has not prompted yet has no rollout and is not shown |
 | stats page, stats key | Anthropic's usage API (`/api/oauth/usage`, the call Claude Code's panel makes) with the login token from `~/.claude/.credentials.json`; fallbacks: `cachedUsageUtilization` in `~/.claude.json` and `~/.config/Claude/plan-usage-history.json` from the desktop app, newest wins; tokens are summed from the transcripts above since local midnight | no login or the call fails (the fallbacks lag and grey out with their age), or the token file or API reply changes shape |
 | calendar | the `.ics` feed at the key's `url`, fetched every five minutes and cached in `~/.cache/deckmate/`; repeating events are expanded by Deckmate itself | the address stops working (Google lets you reset it); the key says "offline" until the next successful fetch, and a rule part Deckmate does not know (BYSETPOS, BYHOUR) makes that event's instances land on the wrong days |
+| weather | Open-Meteo's forecast API with the key's coordinates (a place name goes once to its geocoding API), fetched every fifteen minutes and cached in `~/.cache/deckmate/` | the service is down or rate-limits (the key keeps the last forecast and says "offline" once it is an hour old); a place name the geocoder does not know (the log says so) |
 | slack (channel name) | with a user token on the key: Slack's Web API, `users.conversations` for the list and `conversations.info` per conversation for `unread_count_display` and `last_read` | a revoked token or missing scopes (`invalid_auth`, `missing_scope` in the log); the caption falls back to the workspace name |
 | slack | `root-state.json` under `~/snap/slack/`, `~/.config/Slack/` or the flatpak folder, which holds per-workspace unread totals (so a per-channel badge is not possible) | a Slack update that moves or restructures the file; the key shows "no data" |
-| media | the player's MPRIS properties on the session D-Bus (PlaybackStatus, Metadata), plus one https fetch per cover | the player is not running (the key says so) or drops MPRIS; Spotify leaves the artist empty for podcasts |
+| media | the player's MPRIS properties on the session D-Bus (PlaybackStatus, Metadata), plus one fetch per cover; for a browser, the names on the bus are listed to find its instance | the player is not running or no tab is playing (the key says so), or the player drops MPRIS; Spotify leaves the artist empty for podcasts |
 | vpn | `nmcli connection show`, polled once a second; NetworkManager lets the user at the active seat switch connections without a password | a VPN set up outside NetworkManager (OpenVPN by hand, Tailscale) is not seen; the key then says "not found" |
 | mute, volume | `wpctl` (PipeWire) | a system without PipeWire; the key shows "?" |
 | git dot | `git status` in the session's folder, every 30 seconds in a background thread | never fatal; no dot when git is missing |

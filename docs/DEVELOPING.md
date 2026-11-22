@@ -28,7 +28,7 @@ environment and shows up in `journalctl`):
 
 ```
 ./dev.sh start            # stop the installed board, run the checkout's on the deck
-./dev.sh start --fakes    # ... with made-up sessions and canned Slack, usage and calendar data
+./dev.sh start --fakes    # ... with made-up sessions and canned Slack, usage, calendar and weather data
 ./dev.sh settings         # the checkout's settings window
 ./dev.sh tray             # the checkout's tray icon in place of the installed one
 ./dev.sh log              # follow the dev board's log
@@ -42,7 +42,8 @@ Claude usage API (`usage.json`, whose 5-hour window is 97% used and resets
 three minutes after the start, so the cyan sweep and the reset notification
 can be watched), and the calendar feed (`calendar.ics`, with a meeting
 running now and one starting in 14 minutes, so the key turns red a minute
-later). A Slack key then works without Slack installed, and a token of any
+later) and the weather (`weather.json`, an Open-Meteo reply moved to the
+present, with rain now and every kind of weather on the page). A Slack key then works without Slack installed, and a token of any
 text (`xoxp-test`) makes it name the unread conversation. `fakes.py`
 documents the files; the same fixtures back `tests/test_fakes.py`. The
 board itself also takes `--fakes DIR`. `./dev.sh start --fakes --config tests/fixtures/keys.json`
@@ -62,9 +63,10 @@ shows a board with every such key on it instead of your own layout.
 | `sessionkeys.py` | Claude Code session slots, counters, pagers, the hidden-sessions page |
 | `statskeys.py` | the stats page and the stats key |
 | `slackkey.py`, `todokeys.py` | the Slack key; the to-do key, its sub-deck and item keys |
-| `mediakeys.py`, `mpris.py` | Spotify (any MPRIS player) keys; the D-Bus side with the cover cache |
+| `mediakeys.py`, `mpris.py` | Spotify (or a browser tab, or any MPRIS player) keys; the D-Bus side with the cover cache and the browser-instance lookup |
 | `vpnkey.py` | the VPN key over nmcli |
 | `calfeed.py`, `calendarkeys.py` | the iCalendar feed: fetch, cache, parse, recurrence; the calendar key and its page |
+| `weather.py`, `weatherkeys.py` | Open-Meteo: fetch, cache, geocoding, the forecast; the weather key, its glyphs and its page |
 | `saver.py` | the screen saver: picture or big clock |
 | `board.py` | pure logic with no drawing: press and hold detection, dismissals, filter, paging, pulses, scrolling, breathing |
 | `sessions.py` | finds live Claude Code sessions and classifies their state from the transcript |
@@ -75,7 +77,7 @@ shows a board with every such key on it instead of your own layout.
 | `slackapi.py` | optional: which conversation is unread, from Slack's Web API with a user token |
 | `todo.py` | parses and watches the Markdown to-do list |
 | `system.py` | shell helpers and which account owns the screen (logind) |
-| `fakes.py`, `tests/fixtures/` | canned Slack, usage and calendar data for trying keys without accounts (`DECKMATE_FAKES`) |
+| `fakes.py`, `tests/fixtures/` | canned Slack, usage, calendar and weather data for trying keys without accounts (`DECKMATE_FAKES`) |
 | `dev.sh` | run the checkout on the deck in place of the installed package, and back |
 | `paths.py` | where config, state, pid and log files live; migration from the old name |
 | `settings.py` | settings window (GTK 4 + libadwaita) |
@@ -123,8 +125,8 @@ ruff check .
 The tests cover press and hold detection, dismissal and return, filters,
 paging, the state store, pulse detection and timing, scrolling and breathing,
 the session state classifier, the token tally and plan usage, git probing, the
-to-do parser, the Slack parser, and the layout loader (every key type and page
-renders). They need the DejaVu fonts but no deck. `build_deb.sh` runs them and
+to-do parser, the Slack parser, the weather parser and key, the browser
+player lookup, and the layout loader (every key type and page renders). They need the DejaVu fonts but no deck. `build_deb.sh` runs them and
 refuses to build on a failure. Ruff's configuration is in `pyproject.toml`;
 CI runs it with `pipx run ruff`.
 

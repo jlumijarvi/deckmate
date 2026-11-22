@@ -18,12 +18,13 @@ from statskeys import StatsKey, stats_provider
 from todo import TodoList
 from todokeys import TodoKey
 from vpnkey import Vpn
+from weatherkeys import WeatherKey
 
 log = logging.getLogger("deck")
 
 
 KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume, "slack": Slack, "media": Media,
-             "vpn": Vpn, "calendar": Calendar}
+             "vpn": Vpn, "calendar": Calendar, "weather": WeatherKey}
 
 
 class BuildContext:

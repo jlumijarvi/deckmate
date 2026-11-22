@@ -2,10 +2,16 @@
 interface Spotify and most Linux players publish and GNOME's own media controls
 use. Read-only apart from the play / pause / next / previous calls. No login.
 
-A player is addressed by the last part of its bus name: "spotify" for
-org.mpris.MediaPlayer2.spotify. Metadata keys used: xesam:title, xesam:artist
-(a list; Spotify leaves it empty for podcasts), xesam:album, mpris:artUrl (an
-https URL for Spotify, file:// for most other players).
+A player is addressed by the part of its bus name after the prefix: "spotify"
+for org.mpris.MediaPlayer2.spotify. Browsers add an instance to theirs
+(org.mpris.MediaPlayer2.firefox.instance_1_23, ...chromium.instance559273;
+Chrome calls itself chromium) and publish one only while a tab has media, so a
+player name also matches names with a suffix, and "browser" matches any
+browser. With several instances the one playing wins, then a paused one.
+Metadata keys used: xesam:title, xesam:artist (a list; Spotify leaves it empty
+for podcasts; a browser puts the channel or site there), xesam:album,
+mpris:artUrl (an https URL for Spotify and Firefox, file:// for Chrome and
+most other players).
 """
 import io
 import threading
@@ -23,6 +29,7 @@ OBJECT_PATH = "/org/mpris/MediaPlayer2"
 PLAYER_IFACE = "org.mpris.MediaPlayer2.Player"
 PROPS_IFACE = "org.freedesktop.DBus.Properties"
 REFRESH_S = 1.0
+BROWSERS = ("firefox", "chromium", "chrome", "brave", "vivaldi", "opera", "epiphany", "librewolf")
 ART_PX = 72
 ART_CACHE = 8
 
@@ -43,6 +50,30 @@ def parse_metadata(md):
         artist = ", ".join(a for a in artist if a)
     return Track(title=str(md.get("xesam:title") or ""), artist=str(artist),
                  album=str(md.get("xesam:album") or ""), art_url=str(md.get("mpris:artUrl") or ""))
+
+
+def candidates(names, player):
+    """The bus names among `names` that are this player: the exact name, or one
+    with an instance suffix; "browser" takes any browser."""
+    out = []
+    for n in names:
+        if not n.startswith(BUS_PREFIX):
+            continue
+        stem = n[len(BUS_PREFIX):].split(".", 1)[0]
+        if stem == player or (player == "browser" and stem in BROWSERS):
+            out.append(n)
+    return sorted(out)
+
+
+def pick(statuses):
+    """Of several instances ({bus name: PlaybackStatus}) the one playing, else a
+    paused one, else the first by name; None without any."""
+    rank = {"Playing": 0, "Paused": 1}
+    return min(statuses, key=lambda n: (rank.get(statuses[n], 2), n)) if statuses else None
+
+
+def is_browser(player):
+    return player == "browser" or player in BROWSERS
 
 
 def cover(img, px=ART_PX):
@@ -120,12 +151,37 @@ class MediaPlayer:
                 self._bus = False
         return self._bus or None
 
-    def _call(self, iface, method, args=None, timeout_ms=800):
+    def _call(self, iface, method, args=None, timeout_ms=800, bus_name=None):
         bus = self._connection()
         if bus is None:
             return None
-        return bus.call_sync(self.bus_name, OBJECT_PATH, iface, method, args, None,
+        return bus.call_sync(bus_name or self.bus_name, OBJECT_PATH, iface, method, args, None,
                              Gio.DBusCallFlags.NO_AUTO_START, timeout_ms, None)
+
+    def _names(self):
+        """Every name on the session bus."""
+        bus = self._connection()
+        if bus is None:
+            return []
+        res = bus.call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ListNames",
+                            None, None, Gio.DBusCallFlags.NONE, 800, None)
+        return list(res.unpack()[0])
+
+    def _player_props(self):
+        """The Player properties of the instance to show, or None when none runs."""
+        found = {}
+        for name in candidates(self._names(), self.name):
+            try:
+                res = self._call(PROPS_IFACE, "GetAll", GLib.Variant("(s)", (PLAYER_IFACE,)), bus_name=name)
+            except GLib.Error:            # gone between the listing and the call
+                continue
+            if res is not None:
+                found[name] = res.unpack()[0]
+        chosen = pick({n: str(p.get("PlaybackStatus") or "") for n, p in found.items()})
+        if chosen is None:
+            return None
+        self.bus_name = chosen
+        return found[chosen]
 
     def refresh(self):
         now = time.monotonic()
@@ -136,14 +192,13 @@ class MediaPlayer:
             self.error, self.running = "no D-Bus", False
             return
         try:
-            res = self._call(PROPS_IFACE, "GetAll", GLib.Variant("(s)", (PLAYER_IFACE,)))
-        except GLib.Error:            # not running (ServiceUnknown), or no reply
+            props = self._player_props()
+        except GLib.Error:            # no reply from the bus
             self.running, self.status = False, ""
             return
-        if res is None:
-            self.running = False
+        if props is None:
+            self.running, self.status = False, ""
             return
-        props = res.unpack()[0]
         self.running = True
         self.status = str(props.get("PlaybackStatus") or "")
         self.track = parse_metadata(props.get("Metadata"))

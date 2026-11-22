@@ -6,6 +6,10 @@ the tests. `fakes.py` documents each file. Times are relative to the board's
 start: the usage fixture's 5-hour window is 97% used and resets two minutes
 in, so the cyan sweep and the reset notification can be watched; the
 calendar has a meeting running now and one starting in 14 minutes, so the
-calendar key turns red one minute later.
+calendar key turns red one minute later. The weather is a real Open-Meteo
+reply for Helsinki moved to the present, with the conditions changed so that
+rain, snow, thunder, clear sky and fog all appear on the weather page.
 
-`keys.json` is a layout with every such key on it, for `./dev.sh start --fakes --config tests/fixtures/keys.json`.
+`keys.json` is a layout with every such key on it, plus a media key for the
+browser (which needs no fakes: it shows whatever tab is playing), for
+`./dev.sh start --fakes --config tests/fixtures/keys.json`.

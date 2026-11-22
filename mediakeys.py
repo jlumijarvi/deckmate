@@ -1,16 +1,19 @@
 """Media keys: play / pause with the track and its album art, next, previous.
-Any MPRIS player; Spotify by default."""
+Any MPRIS player; Spotify by default, "browser" for YouTube (or anything else)
+playing in a browser tab."""
 from PIL import ImageDraw
 
 from deckhid import KEY_PX
 from keys import Key
-from mpris import player
+from mpris import is_browser, player
 from render import dim, draw_centered_lines, fit_lines, tile
 from system import launch
 
 ACTIONS = ("playpause", "next", "previous")
-PLAYER_NAMES = {"spotify": "Spotify"}
-PLAYER_COLORS = {"spotify": (30, 215, 96)}    # Spotify green
+PLAYER_NAMES = {"spotify": "Spotify", "browser": "Browser", "firefox": "Firefox", "chromium": "Chrome"}
+PLAYER_COLORS = {"spotify": (30, 215, 96),    # Spotify green
+                 "browser": (205, 40, 40), "firefox": (230, 96, 0), "chromium": (66, 133, 244)}
+BROWSER_LAUNCH = "xdg-open https://www.youtube.com/"   # a browser "plays" once a tab has media
 GLYPH = (235, 235, 240)
 
 
@@ -46,6 +49,7 @@ class Media(Key):
             self.action = "playpause"
         self.player_name = cfg.get("player") or "spotify"
         self.player = player(self.player_name)
+        self.browser = is_browser(self.player_name)
 
     @property
     def label(self):
@@ -66,8 +70,8 @@ class Media(Key):
             img, d, fg = tile(dim(color, 0.15), pressed)
             lines, size = fit_lines(self.label, max_lines=1, sizes=(14, 12, 11, 10, 9))
             draw_centered_lines(d, lines, fg, size=size, top=18)
-            draw_centered_lines(d, [p.error or "not running"], (160, 160, 170) if not pressed else fg,
-                                size=10, top=42, bold=False)
+            idle = p.error or ("nothing playing" if self.browser else "not running")
+            draw_centered_lines(d, [idle], (160, 160, 170) if not pressed else fg, size=10, top=42, bold=False)
             return img
         art = p.artwork()
         if art is not None and not pressed:
@@ -101,4 +105,4 @@ class Media(Key):
         elif p.running:
             p.play_pause()
         else:
-            launch(self.cfg.get("launch") or self.player_name)
+            launch(self.cfg.get("launch") or (BROWSER_LAUNCH if self.browser else self.player_name))

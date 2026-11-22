@@ -6,7 +6,7 @@ import unittest
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from mpris import ArtCache, MediaPlayer, Track, cover, parse_metadata  # noqa: E402
+from mpris import ArtCache, MediaPlayer, Track, candidates, cover, is_browser, parse_metadata, pick  # noqa: E402
 
 
 class MetadataTest(unittest.TestCase):
@@ -22,6 +22,33 @@ class MetadataTest(unittest.TestCase):
     def test_nothing(self):
         self.assertEqual(parse_metadata(None), Track())
         self.assertEqual(parse_metadata({}), Track())
+
+
+class InstanceTest(unittest.TestCase):
+    NAMES = [":1.3", "org.freedesktop.DBus", "org.mpris.MediaPlayer2.spotify",
+             "org.mpris.MediaPlayer2.firefox.instance_1_23", "org.mpris.MediaPlayer2.chromium.instance559273",
+             "org.mpris.MediaPlayer2.chromium.instance7", "org.mpris.MediaPlayer2.vlc", "org.mpris.MediaPlayer2"]
+
+    def test_candidates(self):
+        self.assertEqual(candidates(self.NAMES, "spotify"), ["org.mpris.MediaPlayer2.spotify"])
+        self.assertEqual(candidates(self.NAMES, "firefox"), ["org.mpris.MediaPlayer2.firefox.instance_1_23"])
+        self.assertEqual(candidates(self.NAMES, "chromium"), ["org.mpris.MediaPlayer2.chromium.instance559273",
+                                                              "org.mpris.MediaPlayer2.chromium.instance7"])
+        self.assertEqual(candidates(self.NAMES, "browser"), ["org.mpris.MediaPlayer2.chromium.instance559273",
+                                                             "org.mpris.MediaPlayer2.chromium.instance7",
+                                                             "org.mpris.MediaPlayer2.firefox.instance_1_23"])
+        self.assertEqual(candidates(self.NAMES, "spot"), [])
+        self.assertEqual(candidates([], "browser"), [])
+
+    def test_pick_prefers_the_one_playing(self):
+        self.assertIsNone(pick({}))
+        self.assertEqual(pick({"b": "Paused", "a": "Stopped"}), "b")
+        self.assertEqual(pick({"b": "Paused", "a": "Playing", "c": "Playing"}), "a")
+        self.assertEqual(pick({"b": "", "a": ""}), "a")
+
+    def test_is_browser(self):
+        self.assertTrue(is_browser("browser") and is_browser("firefox") and is_browser("chromium"))
+        self.assertFalse(is_browser("spotify"))
 
 
 class CoverTest(unittest.TestCase):
@@ -75,6 +102,7 @@ class PlayerWithoutBusTest(unittest.TestCase):
         p = MediaPlayer("nonexistent-player-for-tests")
         p.refresh()
         self.assertFalse(p.running)
+        self.assertEqual(p.bus_name, "org.mpris.MediaPlayer2.nonexistent-player-for-tests")
         p.play_pause()      # must not raise, with or without a session bus
         p.next()
         self.assertIsNone(p.artwork())

@@ -28,8 +28,8 @@ def every_type(todo_file):
             "2": {"type": "mute", "target": "source", "title": "Mic"},
             "3": {"type": "volume", "step": -5},
             "4": {"type": "slack"},
-            "6": {"type": "media"},
-            "7": {"type": "media", "action": "next"},
+            "6": {"type": "media", "player": "browser"},
+            "7": {"type": "weather", "place": "60.17, 24.94", "title": "Home"},
             "8": {"type": "brightness", "steps": [20, 80]},
             "9": {"type": "todo", "file": todo_file, "soon_days": 2},
             "10": {"type": "counter", "state": "waiting"},
@@ -58,8 +58,10 @@ class FakeStats:
 
 
 def isolate(test, tmp):
-    """Keep a test away from the account's own files: the stats provider and the
-    dismissed-sessions state file."""
+    """Keep a test away from the account's own files and the network: the stats
+    provider, the dismissed-sessions state file, and the weather service."""
+    from test_weather import stub_network
+    stub_network(test)
     statskeys._stats_provider = FakeStats()
     test._state_file = sessionkeys.STATE_FILE
     sessionkeys.STATE_FILE = os.path.join(tmp, "state.json")
@@ -92,7 +94,9 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(len(keys), KEY_COUNT)
         self.assertEqual(brightness, 60)
         self.assertTrue(saver.enabled and saver.is_tiles)
-        self.assertEqual([type(k).__name__ for k in keys[5:9]], ["SessionSlot", "Media", "Media", "Brightness"])
+        self.assertEqual([type(k).__name__ for k in keys[5:9]], ["SessionSlot", "Media", "WeatherKey", "Brightness"])
+        self.assertTrue(keys[6].browser)
+        self.assertTrue(keys[7].source.located)
         self.assertIsInstance(keys[9], TodoKey)
         self.assertEqual(keys[9].todo.soon_days, 2)
         keys[9].todo.refresh()

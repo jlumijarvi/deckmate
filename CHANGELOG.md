@@ -3,6 +3,16 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Weather key (#23): temperature, conditions and today's high and low for a
+  place, from Open-Meteo (no account). Press opens the next hours and the
+  coming ten days as a folder, hold opens the forecast in the browser.
+- YouTube on the media keys (#24): with the player set to Browser, the
+  Spotify keys show and control whatever tab is playing in Firefox or
+  Chrome, YouTube included. Browsers publish their player under a name
+  with an instance suffix, which the keys now find.
+
 ## 0.12.2 (2026-11-19)
 
 - Test fixtures and samples use plainly made-up names.

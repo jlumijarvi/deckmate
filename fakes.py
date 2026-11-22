@@ -1,6 +1,6 @@
 """Canned data for the sources that need a network or an account: Slack's
-state file and Web API, the Claude usage API and the calendar feed. With
-DECKMATE_FAKES set to a directory (dev.sh --fakes points it at
+state file and Web API, the Claude usage API, the calendar feed and the
+weather. With DECKMATE_FAKES set to a directory (dev.sh --fakes points it at
 tests/fixtures), each source answers from a file there instead of calling
 out, so every key can be tried on the deck without a token or an address.
 Unset, nothing here is used.
@@ -16,6 +16,9 @@ Files, all optional:
   calendar.ics       an iCalendar feed; {today} is today's date as 20261119 and
                       {now+15m} a time 15 minutes from the start as 20261119T101500,
                       so the meetings are always today's
+  weather.json       an Open-Meteo forecast reply; it is moved in time so that its
+                      current hour is now, and its latitude and longitude stand in
+                      for the geocoding of any place name
 """
 import json
 import os

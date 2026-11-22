@@ -7,7 +7,7 @@ from datetime import datetime
 from calfeed import feed, next_meeting
 from deckhid import KEY_COUNT, KEY_PX
 from keys import Blank, Key
-from pages import NavKey, back_key, nav
+from pages import NavKey, NoteKey, back_key, nav
 from render import dim, draw_centered_lines, fit_lines, font, tile
 from system import launch
 
@@ -130,17 +130,6 @@ class EventKey(Key):
 
     def press(self):
         open_link(self.occ, self.open_url)
-
-
-class NoteKey(Key):
-    def __init__(self, text):
-        super().__init__({})
-        self.text = text
-
-    def render(self, pressed):
-        img, d, fg = tile((24, 24, 30), pressed)
-        draw_centered_lines(d, self.text.split("\n"), (170, 170, 180) if not pressed else fg, size=11, bold=False)
-        return img
 
 
 class CalendarPage:

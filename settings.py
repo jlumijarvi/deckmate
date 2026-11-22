@@ -26,6 +26,7 @@ from deckhid import Deck, UnsupportedDeck, find_deck, COLS, KEY_COUNT  # noqa: E
 from slackstate import SlackState  # noqa: E402
 from system import board_pid, service_loaded, start_board, stop_board, tray_pid  # noqa: E402
 from calendarkeys import DEFAULT_WARN_MIN  # noqa: E402
+from weather import UNITS  # noqa: E402
 from vpnkey import vpn_connections  # noqa: E402
 
 from paths import HERE, CONFIG, EXAMPLE, config_path, read_layout, version, write_layout  # noqa: E402
@@ -37,6 +38,7 @@ KEY_KINDS = [
     ("folder", "Folder"),
     ("clock", "Clock"),
     ("calendar", "Calendar"),
+    ("weather", "Weather"),
     ("mute_source", "Mic mute"),
     ("mute_sink", "Speaker mute"),
     ("volume_down", "Volume down"),
@@ -44,9 +46,9 @@ KEY_KINDS = [
     ("brightness", "Deck brightness"),
     ("vpn", "VPN on/off"),
     ("slack", "Slack unread badge"),
-    ("media_playpause", "Spotify: play/pause"),
-    ("media_next", "Spotify: next track"),
-    ("media_previous", "Spotify: previous track"),
+    ("media_playpause", "Media: play/pause"),
+    ("media_next", "Media: next track"),
+    ("media_previous", "Media: previous track"),
     ("todo", "To-do list"),
     ("session", "Claude: session slot"),
     ("counter_waiting", "Claude: waiting count"),
@@ -57,6 +59,14 @@ KEY_KINDS = [
     ("stats", "Claude: stats"),
 ]
 KIND_INDEX = {k: i for i, (k, _) in enumerate(KEY_KINDS)}
+# the "player" of a media key: Spotify, or a browser for YouTube and other tabs
+PLAYERS = [
+    ("spotify", "Spotify"),
+    ("browser", "Browser (YouTube, any tab with media)"),
+    ("firefox", "Firefox"),
+    ("chromium", "Chrome or Chromium"),
+]
+PLAYER_LABEL = {"spotify": "Spotify", "browser": "Browser", "firefox": "Firefox", "chromium": "Chrome"}
 KIND_LABEL = dict(KEY_KINDS)
 # shown under the type row; the short labels above must fit the dropdown
 KIND_HINT = {
@@ -67,8 +77,11 @@ KIND_HINT = {
     "mute_sink": "Toggles the speakers; the key shows its state",
     "calendar": "Clock and date with the next meeting from an iCalendar feed; red when one is about to start. "
                 "Press opens the meeting's link, hold opens today's list",
+    "weather": "Temperature and conditions now from Open-Meteo (no account), high and low below. "
+               "Press opens the next hours and ten days as a folder, hold opens the forecast in the browser",
     "slack": "Unread count of one Slack workspace: red with mentions or DMs, blue otherwise",
-    "media_playpause": "The playing track with its cover; press plays or pauses, or launches Spotify",
+    "media_playpause": "The playing track with its cover; press plays or pauses, or starts the player. "
+                       "Spotify, or the browser for YouTube and other tabs",
     "media_next": "Skips to the next track",
     "media_previous": "Goes back to the previous track",
     "todo": "Open items in a Markdown task list; press opens them as a folder",
@@ -115,7 +128,7 @@ def key_kind(cfg, i):
         return ("mute_source" if k.get("target") == "source" else "mute_sink"), k
     if t == "volume":
         return ("volume_up" if int(k.get("step", 5)) > 0 else "volume_down"), k
-    if t in ("clock", "calendar", "slack", "todo", "stats", "brightness", "vpn", "folder"):
+    if t in ("clock", "calendar", "weather", "slack", "todo", "stats", "brightness", "vpn", "folder"):
         return t, k
     if t == "counter":
         return "counter_" + (k.get("state") or "waiting"), k
@@ -127,7 +140,7 @@ def key_kind(cfg, i):
 
 
 def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=None, tiles=None, connection=None,
-            calendar=None, token=None):
+            calendar=None, token=None, weather=None, player=None):
     keys = cfg.setdefault("keys", {})
     sess = [s for s in session_keys(cfg) if s != i]
     old = keys.pop(str(i), None) or {}
@@ -142,6 +155,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
         keys[str(i)] = {"type": "clock"}
     elif kind == "calendar":
         keys[str(i)] = {"type": "calendar", **(calendar or {})}
+    elif kind == "weather":
+        keys[str(i)] = {"type": "weather", **(weather or {}), **({"title": label} if label.strip() else {})}
     elif kind == "slack":
         keys[str(i)] = {"type": "slack", **({"team": team} if team else {}), **({"token": token} if token else {})}
     elif kind == "todo":
@@ -158,7 +173,8 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
     elif kind.startswith("pager_"):
         keys[str(i)] = {"type": "pager", "dir": kind.split("_", 1)[1]}
     elif kind.startswith("media_"):
-        keys[str(i)] = {"type": "media", "action": kind.split("_", 1)[1]}
+        keys[str(i)] = {"type": "media", "action": kind.split("_", 1)[1],
+                        **({"player": player} if player and player != "spotify" else {})}
     elif kind == "mute_source":
         keys[str(i)] = {"type": "mute", "target": "source", "title": label or "Mic"}
     elif kind == "mute_sink":
@@ -172,6 +188,13 @@ def set_key(cfg, i, kind, label="", color="#444444", run="", team=None, todo=Non
         keys[str(i)] = {**old, **new}      # keep fields the dialog does not show (steps, step, player, ...)
         if kind == "slack" and token == "":
             keys[str(i)].pop("token", None)    # the field was cleared on purpose
+        if kind.startswith("media_") and player == "spotify":
+            keys[str(i)].pop("player", None)   # back to the default player
+        if kind == "weather":
+            for field in ("lat", "lon"):
+                keys[str(i)].pop(field, None)  # the dialog's place (a name or "lat, lon") replaces them
+            if not label.strip():
+                keys[str(i)].pop("title", None)
     if sess or "sessions" in cfg:   # a folder has no session slots: do not give it a "sessions" entry
         cfg.setdefault("sessions", {})["keys"] = sorted(sess)
     cfg["keys"] = {k: keys[k] for k in sorted(keys, key=int)}
@@ -191,6 +214,8 @@ def key_summary(cfg, i):
         return "Slack\n" + (k.get("team") or "")
     if kind == "calendar":
         return "Calendar\n" + ("feed set" if k.get("url") else "no feed")
+    if kind == "weather":
+        return "Weather\n" + (k.get("title") or k.get("place") or ("set" if k.get("lat") is not None else "no place"))
     if kind == "todo":
         return "To-do\n" + os.path.basename(k.get("file") or "todo.md")
     if kind.startswith("counter_"):
@@ -206,7 +231,9 @@ def key_summary(cfg, i):
     if kind == "pager_next":
         return "page >"
     if kind.startswith("media_"):
-        return "Spotify\n" + {"playpause": "play/pause", "next": "next", "previous": "previous"}[kind[6:]]
+        who = k.get("player") or "spotify"
+        what = {"playpause": "play/pause", "next": "next", "previous": "previous"}[kind[6:]]
+        return PLAYER_LABEL.get(who, who) + "\n" + what
     if kind == "empty":
         return ""
     return KIND_LABEL[kind]
@@ -352,6 +379,23 @@ class KeyDialog(Adw.Dialog):
         self.cal_warn.set_value(float(k.get("warn_min", DEFAULT_WARN_MIN) or 0))
         group.add(self.cal_warn)
 
+        self.weather_place = Adw.EntryRow(title="Place (a town, or latitude, longitude)")
+        place = k.get("place") or ""
+        if not place and k.get("lat") is not None and k.get("lon") is not None:
+            place = f"{k['lat']}, {k['lon']}"
+        self.weather_place.set_text(place)
+        group.add(self.weather_place)
+        self.weather_units = Adw.ComboRow(title="Temperature")
+        self.weather_units.set_model(Gtk.StringList.new(["Celsius", "Fahrenheit"]))
+        self.weather_units.set_selected(UNITS.index(k["units"]) if k.get("units") in UNITS else 0)
+        group.add(self.weather_units)
+
+        self.player_row = Adw.ComboRow(title="Player")
+        self.player_row.set_model(Gtk.StringList.new([label for _, label in PLAYERS]))
+        player_ids = [p for p, _ in PLAYERS]
+        self.player_row.set_selected(player_ids.index(k["player"]) if k.get("player") in player_ids else 0)
+        group.add(self.player_row)
+
         self.mark_row = Adw.SwitchRow(title="Corner mark (>_) on Claude and Codex keys")
         self.mark_row.set_subtitle("One setting for every session, counter, pager and stats key. "
                                    "Off when the mark tells you nothing, say with Claude alone")
@@ -430,7 +474,7 @@ class KeyDialog(Adw.Dialog):
         kind = self.kind()
         self.hint.set_text(KIND_HINT.get(kind, ""))
         self.hint.set_visible(kind in KIND_HINT)
-        self.label_row.set_visible(kind in ("command", "folder", "mute_source", "mute_sink", "todo", "vpn"))
+        self.label_row.set_visible(kind in ("command", "folder", "mute_source", "mute_sink", "todo", "vpn", "weather"))
         self.color_row.set_visible(kind in ("command", "folder"))
         self.open_row.set_visible(kind == "folder" and self.is_folder)
         self.run_row.set_visible(kind == "command")
@@ -441,6 +485,9 @@ class KeyDialog(Adw.Dialog):
         self.mark_row.set_visible(kind in ("session", "stats") or kind.startswith(("counter_", "pager_")))
         self.cal_url.set_visible(kind == "calendar")
         self.cal_warn.set_visible(kind == "calendar")
+        self.weather_place.set_visible(kind == "weather")
+        self.weather_units.set_visible(kind == "weather")
+        self.player_row.set_visible(kind.startswith("media_"))
         for row in (self.todo_file, self.todo_open, self.todo_soon, self.todo_hold):
             row.set_visible(kind == "todo")
         for row in self.stats_tiles.values():
@@ -462,9 +509,11 @@ class KeyDialog(Adw.Dialog):
         tiles = [name for name, row in self.stats_tiles.items() if row.get_active()]
         connection = self.vpn_names[self.vpn_row.get_selected()] if self.vpn_names else None
         calendar = {"url": self.cal_url.get_text().strip(), "warn_min": int(self.cal_warn.get_value())}
+        weather = {"place": self.weather_place.get_text().strip(), "units": UNITS[self.weather_units.get_selected()]}
         set_key(self.cfg, self.index, self.kind(), label=label, color=color, run=self.run_row.get_text(),
                 team=team, todo=todo, tiles=tiles, connection=connection, calendar=calendar,
-                token=self.token_row.get_text().strip())
+                token=self.token_row.get_text().strip(), weather=weather,
+                player=PLAYERS[self.player_row.get_selected()][0])
         if self.mark_row.get_visible():
             self.window.cfg.setdefault("sessions", {})["mark"] = bool(self.mark_row.get_active())
         self.window.save()

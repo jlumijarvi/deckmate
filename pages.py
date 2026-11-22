@@ -77,3 +77,16 @@ class BackKey(NavKey):
 
 def back_key():
     return BackKey("", "", nav.pop, hold_action=nav.home)
+
+
+class NoteKey(Key):
+    """A line or two of grey text on a page: "nothing today", "offline"."""
+
+    def __init__(self, text):
+        super().__init__({})
+        self.text = text
+
+    def render(self, pressed):
+        img, d, fg = tile((24, 24, 30), pressed)
+        draw_centered_lines(d, self.text.split("\n"), (170, 170, 180) if not pressed else fg, size=11, bold=False)
+        return img
