@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.13.4 (2026-11-26)
 
 - Settings: "Hide done sessions after (hours)" moved from the General page to
   the dialog of the session, counter and pager keys, beside the corner-mark
