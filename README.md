@@ -166,7 +166,8 @@ that is closing its tab. The Claude desktop app keeps the process of a
 session alive after you leave it, and starts it again when the app opens, so
 there a session leaves the board when you archive it in the app. Done
 sessions can also hide themselves: "Hide done sessions after (hours)" in the
-settings (`"sessions": {"hide_done_h": 1}`; 0, the default, means never).
+dialog of any session, counter or pager key, one setting for them all
+(`"sessions": {"hide_done_h": 1}`; 0, the default, means never).
 Such a session comes back when it runs again, and one you bring back by hand
 stays until its state changes.
 

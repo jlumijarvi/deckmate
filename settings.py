@@ -112,6 +112,16 @@ def save_config(cfg):
     write_layout(CONFIG, cfg)
 
 
+def hide_done_hours(cfg):
+    """sessions.hide_done_h for the spin row: whole hours from 0 (never) to a week,
+    whatever a hand-edited layout holds."""
+    try:
+        hours = float(cfg.get("sessions", {}).get("hide_done_h") or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+    return float(max(0, min(168, int(hours))))
+
+
 def session_keys(cfg):
     return sorted({int(x) for x in cfg.get("sessions", {}).get("keys", [])})
 
@@ -402,6 +412,13 @@ class KeyDialog(Adw.Dialog):
         self.mark_row.set_active(bool(self.window.cfg.get("sessions", {}).get("mark", True)))
         group.add(self.mark_row)
 
+        self.hide_done = Adw.SpinRow.new_with_range(0, 168, 1)
+        self.hide_done.set_title("Hide done sessions after (hours)")
+        self.hide_done.set_subtitle("One setting for every session key. 0 means never. "
+                                    "A hidden session comes back when it runs again")
+        self.hide_done.set_value(hide_done_hours(self.window.cfg))
+        group.add(self.hide_done)
+
         self.token_row = Adw.PasswordEntryRow(title="Slack user token (optional)")
         self.token_row.set_text(k.get("token", ""))
         group.add(self.token_row)
@@ -483,6 +500,7 @@ class KeyDialog(Adw.Dialog):
         self.token_hint.set_visible(kind == "slack")
         self.vpn_row.set_visible(kind == "vpn")
         self.mark_row.set_visible(kind in ("session", "stats") or kind.startswith(("counter_", "pager_")))
+        self.hide_done.set_visible(kind == "session" or kind.startswith(("counter_", "pager_")))
         self.cal_url.set_visible(kind == "calendar")
         self.cal_warn.set_visible(kind == "calendar")
         self.weather_place.set_visible(kind == "weather")
@@ -516,6 +534,8 @@ class KeyDialog(Adw.Dialog):
                 player=PLAYERS[self.player_row.get_selected()][0])
         if self.mark_row.get_visible():
             self.window.cfg.setdefault("sessions", {})["mark"] = bool(self.mark_row.get_active())
+        if self.hide_done.get_visible():
+            self.window.cfg.setdefault("sessions", {})["hide_done_h"] = int(self.hide_done.get_value())
         self.window.save()
         self.window.refresh_grid()
         self.close()
@@ -650,16 +670,6 @@ class SettingsWindow(Adw.ApplicationWindow):
         page.add(g)
         self.update_saver_rows()
 
-        g = Adw.PreferencesGroup(title="Sessions")
-        self.hide_done = Adw.SpinRow.new_with_range(0, 168, 1)
-        self.hide_done.set_title("Hide done sessions after (hours)")
-        self.hide_done.set_subtitle("0 means never. A hidden session comes back when it runs again; "
-                                    "the previous-page key, held, shows the hidden ones.")
-        self.hide_done.set_value(float(self.cfg.get("sessions", {}).get("hide_done_h", 0) or 0))
-        self.hide_done.connect("notify::value", self.on_hide_done)
-        g.add(self.hide_done)
-        page.add(g)
-
         g = Adw.PreferencesGroup(title="Notifications")
         self.notify_resets = Adw.SwitchRow(title="Notify when a nearly used-up Claude limit resets")
         self.notify_resets.set_subtitle("A desktop notification when a 5-hour or weekly window that was "
@@ -682,10 +692,6 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def on_notify_resets(self, *_):
         self.cfg.setdefault("notify", {})["resets"] = self.notify_resets.get_active()
-        self.save_soon()
-
-    def on_hide_done(self, *_):
-        self.cfg.setdefault("sessions", {})["hide_done_h"] = int(self.hide_done.get_value())
         self.save_soon()
 
     def on_auto_update(self, *_):

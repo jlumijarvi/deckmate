@@ -96,5 +96,33 @@ class SetKeyTest(unittest.TestCase):
         self.assertEqual(key_kind(cfg, 9)[0], "empty")
 
 
+class HideDoneRowTest(unittest.TestCase):
+    """0.13.3 put the timer on the General page; it is about the session keys, so
+    it belongs in their dialog, beside the corner-mark switch."""
+
+    def test_the_row_lives_in_the_key_dialog(self):
+        import ast
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "settings.py")
+        with open(path, encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+        owners = {}
+        for cls in (n for n in tree.body if isinstance(n, ast.ClassDef)):
+            for node in ast.walk(cls):
+                if isinstance(node, ast.Assign):
+                    for t in node.targets:
+                        if isinstance(t, ast.Attribute) and t.attr in ("hide_done", "mark_row"):
+                            owners.setdefault(t.attr, set()).add(cls.name)
+        self.assertEqual(len(owners["mark_row"]), 1)
+        self.assertEqual(owners["hide_done"], owners["mark_row"])
+
+    @unittest.skipIf(set_key is None, "GTK not available")
+    def test_value_for_the_row(self):
+        from settings import hide_done_hours
+        self.assertEqual(hide_done_hours({"sessions": {"hide_done_h": 4}}), 4.0)
+        self.assertEqual(hide_done_hours({"sessions": {"hide_done_h": 9999}}), 168.0)
+        for cfg in ({}, {"sessions": {}}, {"sessions": {"hide_done_h": "x"}}, {"sessions": {"hide_done_h": -3}}):
+            self.assertEqual(hide_done_hours(cfg), 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

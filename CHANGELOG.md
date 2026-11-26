@@ -3,6 +3,13 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Settings: "Hide done sessions after (hours)" moved from the General page to
+  the dialog of the session, counter and pager keys, beside the corner-mark
+  switch. General holds only what is not about a key. A value already set is
+  kept.
+
 ## 0.13.3 (2026-11-26)
 
 - Sessions of the Claude desktop app (#25): a session archived in the app
