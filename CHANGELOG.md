@@ -3,7 +3,7 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
-## Unreleased
+## 0.13.3 (2026-11-26)
 
 - Sessions of the Claude desktop app (#25): a session archived in the app
   leaves the board. The app keeps a session's process alive, so until now a
