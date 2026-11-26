@@ -3,6 +3,18 @@
 Each release has a section here; the CI workflow uses the section for the
 release notes on GitHub. Dates are the release dates.
 
+## Unreleased
+
+- Sessions of the Claude desktop app (#25): a session archived in the app
+  leaves the board. The app keeps a session's process alive, so until now a
+  finished one stayed green on the deck for as long as the app ran.
+- "Hide done sessions after (hours)" in the settings: a session that has been
+  done that long hides itself and comes back when it runs again. Off (0) by
+  default.
+- A session that asks a question no longer flashes green as "done" first:
+  the board takes "waiting" from Claude Code's own status, which is set a
+  moment before the question reaches the transcript.
+
 ## 0.13.2 (2026-11-22)
 
 - Settings: the media key's Player choice "Browser (YouTube)" fits the row.

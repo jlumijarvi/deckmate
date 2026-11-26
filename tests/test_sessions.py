@@ -144,5 +144,82 @@ class ActivityTest(unittest.TestCase):
             self.assertEqual(subagent_count(""), 0)
 
 
+class LiveStateTest(unittest.TestCase):
+    """The registry entry of a live process, with or without the transcript's view."""
+    DONE = {"state": "done", "waiting_kind": "", "since": 100.0, "activity": ""}
+    ASKING = {"state": "waiting", "waiting_kind": "?", "since": 200.0, "activity": "Approach"}
+
+    def test_waiting_before_the_question_reaches_the_transcript(self):
+        # 0.13.2 read the transcript alone here and flashed the session green as done
+        from sessions import live_state
+        reg = {"status": "waiting", "waitingFor": "input needed", "statusUpdatedAt": 300_000}
+        self.assertEqual(live_state(reg, self.DONE), ("waiting", "?", 300.0, ""))
+        self.assertEqual(live_state(reg, None), ("waiting", "?", 300.0, ""))
+        reg["waitingFor"] = "dialog open"
+        self.assertEqual(live_state(reg, self.DONE), ("waiting", "!", 300.0, ""))
+
+    def test_waiting_takes_the_details_from_the_transcript_once_there(self):
+        from sessions import live_state
+        reg = {"status": "waiting", "waitingFor": "input needed", "statusUpdatedAt": 300_000}
+        self.assertEqual(live_state(reg, self.ASKING), ("waiting", "?", 200.0, "Approach"))
+
+    def test_busy_and_idle(self):
+        from sessions import live_state
+        self.assertEqual(live_state({"status": "busy", "statusUpdatedAt": 5000}, self.ASKING),
+                         ("running", "", 5.0, "Approach"))
+        self.assertEqual(live_state({"status": "idle"}, self.DONE), ("done", "", 100.0, ""))
+        self.assertEqual(live_state({"status": "idle"}, self.ASKING), ("waiting", "?", 200.0, "Approach"))
+        self.assertEqual(live_state({"status": "idle", "statusUpdatedAt": 7000}, None), ("done", "", 7.0, ""))
+
+
+class DesktopRecordsTest(unittest.TestCase):
+    def test_archived_is_read_from_the_apps_record_and_follows_it(self):
+        import tempfile
+        from sessions import DesktopRecords
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = os.path.join(tmp, "account", "org")
+            os.makedirs(folder)
+            path = os.path.join(folder, "local_abc-123.json")
+            records = DesktopRecords(tmp)
+            self.assertFalse(records.archived("local_abc-123"))        # no record yet
+            with open(path, "w") as f:
+                json.dump({"isArchived": False}, f)
+            self.assertFalse(records.archived("local_abc-123"))
+            with open(path, "w") as f:
+                json.dump({"isArchived": True}, f)
+            os.utime(path, ns=(1, 1))
+            self.assertTrue(records.archived("local_abc-123"))
+            with open(path, "w") as f:
+                f.write("{")                                           # the app is mid-write
+            os.utime(path, ns=(2, 2))
+            self.assertTrue(records.archived("local_abc-123"))         # the last answer stands
+            os.remove(path)
+            self.assertFalse(records.archived("local_abc-123"))
+            self.assertFalse(records.archived(None))
+            self.assertFalse(records.archived("../../etc/passwd"))
+
+    def test_scan_leaves_out_an_archived_desktop_session(self):
+        import tempfile
+        from unittest import mock
+        import sessions
+        with tempfile.TemporaryDirectory() as tmp:
+            reg_dir, desk = os.path.join(tmp, "sessions"), os.path.join(tmp, "desk", "a", "o")
+            os.makedirs(reg_dir)
+            os.makedirs(desk)
+            for pid, host, status in ((1, "local_kept", "idle"), (2, "local_archived", "idle"),
+                                      (3, "local_busy", "busy")):
+                with open(os.path.join(reg_dir, f"{pid}.json"), "w") as f:
+                    json.dump({"pid": pid, "sessionId": "", "cwd": f"/work/p{pid}", "status": status,
+                               "entrypoint": "claude-desktop", "hostSessionId": host}, f)
+                with open(os.path.join(desk, host + ".json"), "w") as f:
+                    json.dump({"isArchived": host != "local_kept"}, f)
+            with mock.patch.object(sessions, "SESSIONS_DIR", reg_dir), \
+                    mock.patch.object(sessions, "is_alive", lambda pid, start: True):
+                scanner = sessions.SessionScanner()
+                scanner.desktop = sessions.DesktopRecords(os.path.join(tmp, "desk"))
+                found = {s.pid: s.state for s in scanner.scan()}
+            self.assertEqual(found, {1: "done", 3: "running"})         # archived but still working: shown
+
+
 if __name__ == "__main__":
     unittest.main()

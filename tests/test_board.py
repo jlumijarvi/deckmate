@@ -220,5 +220,68 @@ class PinTest(unittest.TestCase):
             self.assertEqual(again.pinned["id0"]["name"], "b")
 
 
+@dataclass
+class Timed:
+    session_id: str
+    name: str
+    state: str
+    since: float
+
+
+class AutoHideTest(unittest.TestCase):
+    def view(self, store=None, now=10_000.0):
+        self.now = now
+        return SessionView(5, store, hide_done_after=3600, clock=lambda: self.now)
+
+    def test_done_long_enough_is_hidden_and_returns_when_it_runs(self):
+        v = self.view()
+        old, fresh = Timed("old", "old", "done", 1000.0), Timed("new", "new", "done", 9000.0)
+        asking = Timed("ask", "ask", "waiting", 1000.0)
+        v.update([old, fresh, asking])
+        self.assertEqual([s.name for s in v.shown()], ["ask", "new"])
+        self.assertEqual([s.name for s in v.dismissed_sessions()], ["old"])
+        self.assertEqual(v.count("done"), 1)
+        self.now = 13_000.0                                    # an hour after "new" finished
+        v.update([old, fresh, asking])
+        self.assertEqual([s.name for s in v.shown()], ["ask"])
+        v.update([Timed("old", "old", "running", 13_000.0), fresh, asking])
+        self.assertEqual([s.name for s in v.shown()], ["ask", "old"])
+
+    def test_brought_back_by_hand_stays_until_its_state_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "state.json")
+            v = self.view(StateStore(path))
+            old = Timed("old", "old", "done", 1000.0)
+            v.update([old])
+            self.assertEqual(v.shown(), [])
+            v.restore("old")
+            v.update([old])
+            self.assertEqual([s.name for s in v.shown()], ["old"])
+            again = self.view(StateStore(path))                # a restart remembers it
+            again.update([old])
+            self.assertEqual([s.name for s in again.shown()], ["old"])
+            again.update([Timed("old", "old", "running", 10_000.0)])
+            again.update([Timed("old", "old", "done", 1000.0)])   # a new turn ended long ago: hidden again
+            self.assertEqual(again.shown(), [])
+
+    def test_pinned_is_never_hidden_and_off_means_off(self):
+        v = self.view()
+        old = Timed("old", "old", "done", 1000.0)
+        v.hide_done_after = None
+        v.update([old])
+        self.assertEqual(len(v.shown()), 1)
+        v.toggle_pin(old)
+        v.hide_done_after = 3600
+        v.update([old])
+        self.assertEqual(len(v.shown()), 1)
+
+    def test_setting_from_the_layout(self):
+        from layout import hide_done_seconds
+        self.assertEqual(hide_done_seconds({"sessions": {"hide_done_h": 2}}), 7200)
+        for cfg in ({}, {"sessions": {}}, {"sessions": {"hide_done_h": 0}}, {"sessions": {"hide_done_h": "x"}},
+                    {"sessions": {"hide_done_h": -1}}):
+            self.assertIsNone(hide_done_seconds(cfg))
+
+
 if __name__ == "__main__":
     unittest.main()

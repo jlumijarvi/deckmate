@@ -650,6 +650,16 @@ class SettingsWindow(Adw.ApplicationWindow):
         page.add(g)
         self.update_saver_rows()
 
+        g = Adw.PreferencesGroup(title="Sessions")
+        self.hide_done = Adw.SpinRow.new_with_range(0, 168, 1)
+        self.hide_done.set_title("Hide done sessions after (hours)")
+        self.hide_done.set_subtitle("0 means never. A hidden session comes back when it runs again; "
+                                    "the previous-page key, held, shows the hidden ones.")
+        self.hide_done.set_value(float(self.cfg.get("sessions", {}).get("hide_done_h", 0) or 0))
+        self.hide_done.connect("notify::value", self.on_hide_done)
+        g.add(self.hide_done)
+        page.add(g)
+
         g = Adw.PreferencesGroup(title="Notifications")
         self.notify_resets = Adw.SwitchRow(title="Notify when a nearly used-up Claude limit resets")
         self.notify_resets.set_subtitle("A desktop notification when a 5-hour or weekly window that was "
@@ -672,6 +682,10 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def on_notify_resets(self, *_):
         self.cfg.setdefault("notify", {})["resets"] = self.notify_resets.get_active()
+        self.save_soon()
+
+    def on_hide_done(self, *_):
+        self.cfg.setdefault("sessions", {})["hide_done_h"] = int(self.hide_done.get_value())
         self.save_soon()
 
     def on_auto_update(self, *_):

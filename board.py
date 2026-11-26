@@ -56,12 +56,13 @@ class PressTracker:
 
 
 class StateStore:
-    """state.json: {"dismissed": {session_id: state}, "pinned": {session_id: {name, cwd, gone_at?}}}.
+    """state.json: {"dismissed": {session_id: state}, "pinned": {session_id: {name, cwd, gone_at?}},
+    "kept": {session_id: state}} (kept: brought back by hand, so not hidden again by the timer).
     Atomic writes."""
 
     def __init__(self, path):
         self.path = path
-        self.data = {"dismissed": {}, "pinned": {}}
+        self.data = {"dismissed": {}, "pinned": {}, "kept": {}}
         self.load()
 
     def load(self):
@@ -69,7 +70,7 @@ class StateStore:
             with open(self.path) as f:
                 data = json.load(f)
             if isinstance(data, dict):
-                self.data = {"dismissed": {}, "pinned": {}, **data}
+                self.data = {"dismissed": {}, "pinned": {}, "kept": {}, **data}
         except (OSError, ValueError):
             pass
 
@@ -88,12 +89,18 @@ class SessionView:
     """What the session slots show: sessions minus dismissed ones, optionally
     filtered to one state, split into pages of `slots` keys. Pinned sessions
     sort first, cannot be hidden, and stay on the board as "gone" after their
-    process has ended, so the folder is one press away."""
+    process has ended, so the folder is one press away.
+
+    With hide_done_after (seconds) set, a session that has been done that long
+    is hidden by itself; one brought back by hand stays until its state changes."""
     PIN_MODE_S = 5.0
 
-    def __init__(self, slots, store=None):
+    def __init__(self, slots, store=None, hide_done_after=None, clock=time.time):
         self.slots = max(1, slots)
         self.store = store
+        self.hide_done_after = hide_done_after or None
+        self.clock = clock
+        self.kept = dict(store.data.get("kept", {})) if store else {}
         self.dismissed = dict(store.data.get("dismissed", {})) if store else {}
         self.pinned = {sid: dict(rec) for sid, rec in (store.data.get("pinned", {}) if store else {}).items()}
         self.sessions = []
@@ -125,11 +132,20 @@ class SessionView:
                                         ctx_window=0, transcript=""))
         self.sessions = sorted(sessions, key=self.sort_key)
         present = {s.session_id: s for s in self.sessions}
-        for sid, state in list(self.dismissed.items()):
-            s = present.get(sid)
-            if s is None or s.state != state:
-                del self.dismissed[sid]
-                changed = True
+        for record in (self.dismissed, self.kept):
+            for sid, state in list(record.items()):
+                s = present.get(sid)
+                if s is None or s.state != state:
+                    del record[sid]
+                    changed = True
+        if self.hide_done_after:
+            now = self.clock()
+            for s in self.sessions:
+                sid = s.session_id
+                if (s.state == "done" and sid not in self.pinned and sid not in self.dismissed
+                        and sid not in self.kept and now - getattr(s, "since", now) >= self.hide_done_after):
+                    self.dismissed[sid] = s.state
+                    changed = True
         if changed:
             self._persist()
         if self.filter and self.count(self.filter) == 0:
@@ -177,6 +193,7 @@ class SessionView:
         if s is None or s.state == "running" or self.is_pinned(s):
             return False
         self.dismissed[s.session_id] = s.state
+        self.kept.pop(s.session_id, None)
         self._persist()
         return True
 
@@ -185,6 +202,7 @@ class SessionView:
         for s in self.sessions:
             if s.state == "done" and not self.hidden(s) and not self.is_pinned(s):
                 self.dismissed[s.session_id] = s.state
+                self.kept.pop(s.session_id, None)
                 n += 1
         if n:
             self._persist()
@@ -192,7 +210,7 @@ class SessionView:
 
     def restore(self, session_id):
         if session_id in self.dismissed:
-            del self.dismissed[session_id]
+            self.kept[session_id] = self.dismissed.pop(session_id)
             self._persist()
             return True
         return False
@@ -233,6 +251,7 @@ class SessionView:
     def _persist(self):
         if self.store is not None:
             self.store.data["dismissed"] = dict(self.dismissed)
+            self.store.data["kept"] = dict(self.kept)
             self.store.data["pinned"] = {sid: dict(rec) for sid, rec in self.pinned.items()}
             self.store.save()
 

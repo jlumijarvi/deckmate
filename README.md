@@ -161,6 +161,15 @@ board; a running session cannot be hidden. The previous-page key, held, shows
 the hidden sessions, and a press on one brings it back. A session that changes
 state sweeps a band of its new colour across the deck.
 
+A session leaves the board when its Claude Code process ends: in VS Code
+that is closing its tab. The Claude desktop app keeps the process of a
+session alive after you leave it, and starts it again when the app opens, so
+there a session leaves the board when you archive it in the app. Done
+sessions can also hide themselves: "Hide done sessions after (hours)" in the
+settings (`"sessions": {"hide_done_h": 1}`; 0, the default, means never).
+Such a session comes back when it runs again, and one you bring back by hand
+stays until its state changes.
+
 When there are more sessions than slots, the pager keys turn pages. The
 counters show how many sessions are in each state and filter the board to one
 state when pressed.
@@ -373,7 +382,7 @@ is updated. Everything is read-only; nothing is sent anywhere.
 
 | Key | Source | When it breaks |
 | --- | --- | --- |
-| sessions, counters, pagers | `~/.claude/sessions/<pid>.json` (one per running Claude Code process: title, folder, busy or idle) and the transcript `~/.claude/projects/<folder>/<session>.jsonl`, whose last entries decide waiting / done / failed | a Claude Code update that changes either file's layout; sessions then show as done or vanish |
+| sessions, counters, pagers | `~/.claude/sessions/<pid>.json` (one per running Claude Code process: title, folder, busy, waiting or idle) and the transcript `~/.claude/projects/<folder>/<session>.jsonl`, whose last entries decide waiting / done / failed | a Claude Code update that changes either file's layout; sessions then show as done or vanish |
 | codex sessions | the rollout files under `~/.codex/sessions/`, matched to running `codex` client processes by folder and start time (the file is named with the client's start), their tail (`task_started`, `task_complete`, a tool call with `require_escalated` and no output = approval prompt, `token_count` for the context bar) and `~/.codex/session_index.jsonl` for the thread name | a Codex release that changes the rollout events or naming; sessions then show as done or vanish. A client that has not prompted yet has no rollout and is not shown |
 | stats page, stats key | Anthropic's usage API (`/api/oauth/usage`, the call Claude Code's panel makes) with the login token from `~/.claude/.credentials.json`; fallbacks: `cachedUsageUtilization` in `~/.claude.json` and `~/.config/Claude/plan-usage-history.json` from the desktop app, newest wins; tokens are summed from the transcripts above since local midnight | no login or the call fails (the fallbacks lag and grey out with their age), or the token file or API reply changes shape |
 | calendar | the `.ics` feed at the key's `url`, fetched every five minutes and cached in `~/.cache/deckmate/`; repeating events are expanded by Deckmate itself | the address stops working (Google lets you reset it); the key says "offline" until the next successful fetch, and a rule part Deckmate does not know (BYSETPOS, BYHOUR) makes that event's instances land on the wrong days |

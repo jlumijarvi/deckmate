@@ -3,10 +3,14 @@
 Everything is read from files Claude Code writes locally:
   ~/.claude/sessions/<pid>.json          one per running process (title, cwd, busy/idle)
   ~/.claude/projects/<cwd-mangled>/<sessionId>.jsonl   the transcript
+The Claude desktop app keeps a record per session of its own, read only to
+learn that a session was archived there:
+  ~/.config/Claude/claude-code-sessions/<account>/<org>/local_<id>.json
 
 States:
-  waiting  idle, and the last assistant message stopped at a tool call that has no
-           result yet: a permission prompt ('!') or a question / plan approval ('?')
+  waiting  the process reports waiting, or it is idle and the last assistant message
+           stopped at a tool call that has no result yet: a permission prompt ('!')
+           or a question / plan approval ('?')
   running  the process reports busy
   done     idle and the last turn ended normally
   stopped  the registry file is there but the process is gone
@@ -24,6 +28,8 @@ from datetime import datetime
 
 SESSIONS_DIR = os.path.expanduser("~/.claude/sessions")
 PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
+DESKTOP_SESSIONS_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
+                                    "Claude", "claude-code-sessions")
 TAIL_BYTES = 256 * 1024
 
 STATE_ORDER = {"waiting": 0, "running": 1, "done": 2, "stopped": 3, "failed": 4, "gone": 5}
@@ -258,11 +264,73 @@ class TranscriptReader:
         return result
 
 
+# --- the desktop app's records -------------------------------------------------
+
+class DesktopRecords:
+    """Whether the Claude desktop app has a session archived. The app keeps a
+    session's process alive after its window is left, so archiving it there is
+    what closing a tab is in VS Code. Each record is re-read only when it changed."""
+
+    def __init__(self, root=None):
+        self.root = root or DESKTOP_SESSIONS_DIR
+        self._paths = {}   # host session id -> path of its record
+        self._cache = {}   # path -> (mtime_ns, archived)
+
+    def archived(self, host_id):
+        if not host_id or not re.fullmatch(r"local_[0-9A-Za-z-]+", str(host_id)):
+            return False
+        path = self._paths.get(host_id)
+        if path is None:
+            hits = glob.glob(os.path.join(self.root, "*", "*", f"{host_id}.json"))
+            if not hits:
+                return False
+            path = self._paths[host_id] = hits[0]
+        try:
+            mtime = os.stat(path).st_mtime_ns
+        except OSError:
+            self._paths.pop(host_id, None)
+            self._cache.pop(path, None)
+            return False
+        cached = self._cache.get(path)
+        if cached and cached[0] == mtime:
+            return cached[1]
+        try:
+            with open(path) as f:
+                archived = json.load(f).get("isArchived") is True
+        except (OSError, ValueError, AttributeError):
+            return cached[1] if cached else False   # being written: keep the last answer
+        self._cache[path] = (mtime, archived)
+        return archived
+
+
 # --- registry ----------------------------------------------------------------
+
+def live_state(reg, info):
+    """(state, waiting_kind, since, activity) of a session whose process is alive,
+    from its registry entry and the transcript analysis (None without a transcript).
+
+    The registry's own "waiting" is trusted over the transcript: it is set a
+    moment before the question's tool call reaches the transcript, and in that
+    moment the transcript alone reads as a finished turn."""
+    status = reg.get("status")
+    changed = (reg.get("statusUpdatedAt") or reg.get("updatedAt") or 0) / 1000.0
+    if status == "busy":
+        return "running", "", changed, info["activity"] if info else ""
+    pending = bool(info) and info["state"] == "waiting"
+    if status == "waiting":
+        if pending:
+            return "waiting", info["waiting_kind"], info["since"] or changed, info["activity"]
+        return "waiting", "?" if reg.get("waitingFor") == "input needed" else "!", changed, ""
+    if info:
+        return (info["state"], info["waiting_kind"], info["since"] or (reg.get("statusUpdatedAt") or 0) / 1000.0,
+                info["activity"] if pending else "")
+    return "done", "", (reg.get("statusUpdatedAt") or 0) / 1000.0, ""
+
 
 class SessionScanner:
     def __init__(self):
         self.reader = TranscriptReader()
+        self.desktop = DesktopRecords()
 
     def scan(self):
         sessions = []
@@ -288,18 +356,13 @@ class SessionScanner:
             if not alive:
                 state, kind = "stopped", ""
                 since = os.path.getmtime(path)
-            elif reg.get("status") == "busy":
-                state, kind = "running", ""
-                since = (reg.get("statusUpdatedAt") or reg.get("updatedAt") or 0) / 1000.0
-                activity = info["activity"] if info else ""
-                agents = subagent_count(transcript)
-            elif info:
-                state, kind = info["state"], info["waiting_kind"]
-                since = info["since"] or (reg.get("statusUpdatedAt") or 0) / 1000.0
-                activity = info["activity"] if state == "waiting" else ""
             else:
-                state, kind = "done", ""
-                since = (reg.get("statusUpdatedAt") or 0) / 1000.0
+                state, kind, since, activity = live_state(reg, info)
+                if state == "running":
+                    agents = subagent_count(transcript)
+            if (state != "running" and reg.get("entrypoint") == "claude-desktop"
+                    and self.desktop.archived(reg.get("hostSessionId"))):
+                continue  # archived in the desktop app: closed, as far as the person is concerned
 
             sessions.append(Session(
                 pid=pid, session_id=session_id, name=name, cwd=cwd,

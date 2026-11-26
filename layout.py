@@ -27,6 +27,15 @@ KEY_TYPES = {"command": Command, "clock": Clock, "mute": Mute, "volume": Volume,
              "vpn": Vpn, "calendar": Calendar, "weather": WeatherKey}
 
 
+def hide_done_seconds(cfg):
+    """sessions.hide_done_h from the layout as seconds; None (never) for 0, nothing or nonsense."""
+    try:
+        hours = float(cfg.get("sessions", {}).get("hide_done_h") or 0)
+    except (TypeError, ValueError, AttributeError):
+        return None
+    return hours * 3600 if hours > 0 else None
+
+
 class BuildContext:
     """What the keys of one layout share: the layout file, the session board
     (made on first use), the to-do lists by file, and the providers to refresh."""
@@ -39,7 +48,7 @@ class BuildContext:
 
     def board(self):
         if self._board is None:
-            self._board = SessionBoard(self.slots or 1)
+            self._board = SessionBoard(self.slots or 1, hide_done_after=hide_done_seconds(self.cfg))
             self.providers.append(self._board)
             self.providers.append(stats_provider())   # limits: watched for window resets (cyan pulse)
         return self._board

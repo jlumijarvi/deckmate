@@ -50,10 +50,10 @@ class SessionBoard:
     """Shared scanner plus the SessionView (dismissals, filter, paging); refreshed
     once per tick, read by every SessionSlot, CounterKey and PagerKey."""
 
-    def __init__(self, slots):
+    def __init__(self, slots, hide_done_after=None):
         self.scanners = [SessionScanner(), CodexScanner()]
         self.store = StateStore(STATE_FILE)
-        self.view = SessionView(slots, self.store)
+        self.view = SessionView(slots, self.store, hide_done_after=hide_done_after)
         self.git = GitWatcher()
         self.sessions = []
         self.known_states = {}
